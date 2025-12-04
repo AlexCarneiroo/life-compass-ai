@@ -1,17 +1,23 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { MobileNav } from '@/components/layout/MobileNav';
 import { DashboardSection } from '@/components/sections/DashboardSection';
 import { HabitsSection } from '@/components/sections/HabitsSection';
 import { CheckinSection } from '@/components/sections/CheckinSection';
 import { MoodSection } from '@/components/sections/MoodSection';
 import { FinanceSection } from '@/components/sections/FinanceSection';
-import { PlaceholderSection } from '@/components/sections/PlaceholderSection';
+import { HealthSection } from '@/components/sections/HealthSection';
+import { RoutinesSection } from '@/components/sections/RoutinesSection';
+import { GoalsSection } from '@/components/sections/GoalsSection';
+import { JournalSection } from '@/components/sections/JournalSection';
+import { WorkSection } from '@/components/sections/WorkSection';
+import { AICoachSection } from '@/components/sections/AICoachSection';
+import { ReportsSection } from '@/components/sections/ReportsSection';
 import { cn } from '@/lib/utils';
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const renderSection = () => {
     switch (activeSection) {
@@ -26,19 +32,19 @@ const Index = () => {
       case 'finance':
         return <FinanceSection />;
       case 'goals':
-        return <PlaceholderSection title="Metas & Objetivos" description="Defina e acompanhe suas metas pessoais e profissionais" emoji="⭐" />;
+        return <GoalsSection />;
       case 'health':
-        return <PlaceholderSection title="Saúde" description="Monitore seu peso, exercícios e bem-estar físico" emoji="💪" />;
+        return <HealthSection />;
       case 'routines':
-        return <PlaceholderSection title="Rotinas Inteligentes" description="Crie rotinas personalizadas com timer e checklist" emoji="⏰" />;
+        return <RoutinesSection />;
       case 'journal':
-        return <PlaceholderSection title="Diário" description="Escreva, grave áudios e receba insights da IA" emoji="📔" />;
+        return <JournalSection />;
       case 'work':
-        return <PlaceholderSection title="Vida Profissional" description="Acompanhe projetos, metas de carreira e desenvolvimento" emoji="💼" />;
+        return <WorkSection />;
       case 'ai':
-        return <PlaceholderSection title="IA Coach" description="Seu assistente pessoal para análises e sugestões" emoji="🤖" />;
+        return <AICoachSection />;
       case 'reports':
-        return <PlaceholderSection title="Relatórios" description="Análises semanais e mensais do seu progresso" emoji="📊" />;
+        return <ReportsSection />;
       default:
         return <DashboardSection />;
     }
@@ -46,15 +52,24 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block">
+        <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+      </div>
+      
+      {/* Mobile Navigation */}
+      <MobileNav activeSection={activeSection} onSectionChange={setActiveSection} />
       
       <div className={cn(
         "transition-all duration-300",
-        "ml-64" // Default to expanded sidebar
+        "lg:ml-64", // Desktop sidebar margin
+        "pt-14 pb-20 lg:pt-0 lg:pb-0" // Mobile header/footer padding
       )}>
-        <Header />
+        <div className="hidden lg:block">
+          <Header />
+        </div>
         
-        <main className="p-6">
+        <main className="p-4 sm:p-6">
           {renderSection()}
         </main>
       </div>

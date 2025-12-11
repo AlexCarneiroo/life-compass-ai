@@ -1,10 +1,37 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { mockUserStats } from '@/lib/mockData';
 import { Sparkles, Flame, Trophy, Target } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { userStatsService } from '@/lib/firebase/userStats';
+import { UserStats } from '@/types';
 
 export function LevelProgress() {
-  const { level, xp, xpToNextLevel, currentStreak, longestStreak, badges } = mockUserStats;
-  const progressPercent = (xp / xpToNextLevel) * 100;
+  const { userId } = useAuth();
+  const [stats, setStats] = useState<UserStats>({
+    level: 1,
+    xp: 0,
+    xpToNextLevel: 100,
+    totalHabitsCompleted: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    badges: [],
+  });
+
+  useEffect(() => {
+    loadStats();
+  }, [userId]);
+
+  const loadStats = async () => {
+    try {
+      const userStats = await userStatsService.getOrCreate(userId);
+      setStats(userStats);
+    } catch (error) {
+      console.error('Erro ao carregar stats:', error);
+    }
+  };
+
+  const { level, xp, xpToNextLevel, currentStreak, longestStreak, badges } = stats;
+  const progressPercent = xpToNextLevel > 0 ? (xp / (xp + xpToNextLevel)) * 100 : 0;
 
   const levelTitles: Record<number, string> = {
     1: 'Iniciante',
@@ -25,11 +52,11 @@ export function LevelProgress() {
         <div className="flex flex-col lg:flex-row items-center gap-6">
           {/* Avatar & Level */}
           <div className="relative">
-            <div className="w-24 h-24 rounded-2xl gradient-primary flex items-center justify-center shadow-glow animate-bounce-soft">
+            <div className="w-24 h-24 rounded-2xl gradient-indigo flex items-center justify-center shadow-glow animate-bounce-soft">
               <span className="text-4xl">🧙‍♂️</span>
             </div>
-            <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl gradient-accent flex items-center justify-center shadow-md">
-              <span className="text-lg font-bold text-accent-foreground">{level}</span>
+            <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl gradient-pink flex items-center justify-center shadow-md">
+              <span className="text-lg font-bold text-pink-foreground">{level}</span>
             </div>
           </div>
 
@@ -53,7 +80,7 @@ export function LevelProgress() {
             {/* XP Progress Bar */}
             <div className="w-full h-4 bg-muted rounded-full overflow-hidden">
               <div 
-                className="h-full gradient-primary transition-all duration-1000 rounded-full relative"
+                className="h-full gradient-indigo transition-all duration-1000 rounded-full relative"
                 style={{ width: `${progressPercent}%` }}
               >
                 <div className="absolute inset-0 animate-shimmer" />
@@ -85,7 +112,7 @@ export function LevelProgress() {
                   <Target className="w-4 h-4 text-success" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">{mockUserStats.totalHabitsCompleted}</p>
+                  <p className="text-sm font-semibold">{stats.totalHabitsCompleted}</p>
                   <p className="text-xs text-muted-foreground">Hábitos completos</p>
                 </div>
               </div>

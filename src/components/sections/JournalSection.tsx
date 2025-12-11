@@ -1,7 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/hooks/useAuth';
+import { journalService, JournalEntry } from '@/lib/firebase/journal';
+import { toast } from 'sonner';
+import { MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { 
   Plus, 
   Mic, 
@@ -14,55 +23,61 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface JournalEntry {
-  id: string;
-  date: string;
-  content: string;
-  mood: string;
-  type: 'text' | 'audio' | 'photo';
-  duration?: number;
-  aiInsight?: string;
-}
-
-const mockEntries: JournalEntry[] = [
-  {
-    id: '1',
-    date: '2024-01-28',
-    content: 'Hoje foi um dia muito produtivo! Consegui finalizar o projeto que estava atrasado e ainda tive tempo para fazer exercício. Me sinto realizado.',
-    mood: '😊',
-    type: 'text',
-    aiInsight: 'Notei que você tem se sentido mais realizado em dias com exercício físico. Continue assim!',
-  },
-  {
-    id: '2',
-    date: '2024-01-27',
-    content: 'Áudio gravado - 3:45min',
-    mood: '😐',
-    type: 'audio',
-    duration: 225,
-    aiInsight: 'Você mencionou preocupação com prazos. Que tal criar uma rotina de planejamento semanal?',
-  },
-  {
-    id: '3',
-    date: '2024-01-26',
-    content: 'Dia difícil no trabalho. Muitas reuniões e pouco tempo para focar. Preciso melhorar minha gestão de tempo.',
-    mood: '😕',
-    type: 'text',
-    aiInsight: 'Identifiquei um padrão: dias com muitas reuniões afetam seu humor. Considere bloquear horários de foco.',
-  },
-  {
-    id: '4',
-    date: '2024-01-25',
-    content: 'Finalmente tirei aquela foto no parque que queria!',
-    mood: '😄',
-    type: 'photo',
-  },
-];
-
 export function JournalSection() {
-  const [entries] = useState(mockEntries);
+  const { userId } = useAuth();
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [newEntry, setNewEntry] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [selectedMood, setSelectedMood] = useState('😊');
+  const [entryType, setEntryType] = useState<'text' | 'audio' | 'photo'>('text');
+
+  useEffect(() => {
+    loadEntries();
+  }, [userId]);
+
+  const loadEntries = async () => {
+    try {
+      const data = await journalService.getAll(userId);
+      setEntries(data);
+    } catch (error) {
+      console.error('Erro ao carregar entradas:', error);
+      toast.error('Erro ao carregar entradas do diário');
+    }
+  };
+
+  const handleSaveEntry = async () => {
+    if (!newEntry.trim()) {
+      toast.error('Por favor, escreva algo antes de salvar');
+      return;
+    }
+
+    try {
+      await journalService.create({
+        date: new Date().toISOString().split('T')[0],
+        content: newEntry,
+        mood: selectedMood,
+        type: entryType,
+      }, userId);
+      await loadEntries();
+      toast.success('Entrada salva com sucesso!');
+      setNewEntry('');
+      setSelectedMood('😊');
+    } catch (error) {
+      console.error('Erro ao salvar entrada:', error);
+      toast.error('Erro ao salvar entrada. Verifique o console para mais detalhes.');
+    }
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    try {
+      await journalService.delete(id);
+      await loadEntries();
+      toast.success('Entrada deletada!');
+    } catch (error) {
+      console.error('Erro ao deletar entrada:', error);
+      toast.error('Erro ao deletar entrada');
+    }
+  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -97,23 +112,42 @@ export function JournalSection() {
             onChange={(e) => setNewEntry(e.target.value)}
             className="min-h-[120px] resize-none"
           />
-          <div className="flex flex-wrap gap-2">
-            <Button className="gradient-primary text-primary-foreground flex-1 sm:flex-none">
-              <Plus className="w-4 h-4 mr-2" />
-              Salvar Entrada
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsRecording(!isRecording)}
-              className={cn(isRecording && "bg-red-500/10 border-red-500 text-red-500")}
-            >
-              {isRecording ? <Pause className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
-              {isRecording ? 'Parar' : 'Gravar Áudio'}
-            </Button>
-            <Button variant="outline">
-              <Image className="w-4 h-4 mr-2" />
-              Adicionar Foto
-            </Button>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Label>Humor:</Label>
+              <div className="flex gap-2">
+                {['😢', '😕', '😐', '🙂', '😊', '😄'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setSelectedMood(emoji)}
+                    className={`w-10 h-10 text-xl rounded-xl transition-all ${
+                      selectedMood === emoji ? 'bg-primary/20 ring-2 ring-primary' : 'bg-muted hover:bg-muted/80'
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button className="gradient-primary text-primary-foreground flex-1 sm:flex-none" onClick={handleSaveEntry}>
+                <Plus className="w-4 h-4 mr-2" />
+                Salvar Entrada
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsRecording(!isRecording)}
+                className={cn(isRecording && "bg-red-500/10 border-red-500 text-red-500")}
+              >
+                {isRecording ? <Pause className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
+                {isRecording ? 'Parar' : 'Gravar Áudio'}
+              </Button>
+              <Button variant="outline">
+                <Image className="w-4 h-4 mr-2" />
+                Adicionar Foto
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -193,6 +227,21 @@ export function JournalSection() {
                       </div>
                     </div>
                   )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleDeleteEntry(entry.id)} className="text-destructive">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Deletar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
               </div>

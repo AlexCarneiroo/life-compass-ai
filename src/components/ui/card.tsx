@@ -9,17 +9,17 @@ const Card = React.forwardRef<
   }
 >(({ className, variant = "default", ...props }, ref) => {
   const variants = {
-    default: "bg-card shadow-sm border border-border/50",
+    default: "bg-card/60 backdrop-blur-sm shadow-md border border-border/30 hover:shadow-lg",
     glass: "glass",
-    gradient: "gradient-card border border-border/30",
-    glow: "bg-card shadow-glow border border-primary/20",
+    gradient: "gradient-card border border-border/30 shadow-lg",
+    glow: "bg-card/60 backdrop-blur-sm shadow-glow border border-primary/20",
   };
 
   return (
     <div
       ref={ref}
       className={cn(
-        "rounded-2xl text-card-foreground transition-all duration-300",
+        "rounded-xl text-card-foreground transition-all duration-300",
         variants[variant],
         className
       )}

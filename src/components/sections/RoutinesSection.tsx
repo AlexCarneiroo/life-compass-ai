@@ -1,7 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/hooks/useAuth';
+import { routinesService, Routine, RoutineTask } from '@/lib/firebase/routines';
+import { toast } from 'sonner';
+import { MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { 
   Sun, 
   Moon, 
@@ -34,71 +42,83 @@ interface RoutineTask {
   completed: boolean;
 }
 
-const mockRoutines: Routine[] = [
-  {
-    id: '1',
-    name: 'Rotina Matinal',
-    icon: '🌅',
-    color: 'from-orange-500 to-yellow-500',
-    estimatedTime: 45,
-    tasks: [
-      { id: '1', name: 'Acordar e se alongar', duration: 5, completed: true },
-      { id: '2', name: 'Beber água com limão', duration: 2, completed: true },
-      { id: '3', name: 'Meditar', duration: 10, completed: false },
-      { id: '4', name: 'Exercício leve', duration: 15, completed: false },
-      { id: '5', name: 'Banho frio', duration: 5, completed: false },
-      { id: '6', name: 'Café da manhã saudável', duration: 10, completed: false },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Rotina Noturna',
-    icon: '🌙',
-    color: 'from-purple-500 to-indigo-500',
-    estimatedTime: 30,
-    tasks: [
-      { id: '1', name: 'Desligar eletrônicos', duration: 1, completed: false },
-      { id: '2', name: 'Journaling', duration: 10, completed: false },
-      { id: '3', name: 'Skincare', duration: 5, completed: false },
-      { id: '4', name: 'Leitura', duration: 15, completed: false },
-    ],
-  },
-  {
-    id: '3',
-    name: 'Modo Foco',
-    icon: '🎯',
-    color: 'from-blue-500 to-cyan-500',
-    estimatedTime: 90,
-    tasks: [
-      { id: '1', name: 'Definir 3 prioridades', duration: 5, completed: false },
-      { id: '2', name: 'Pomodoro #1 (25min)', duration: 25, completed: false },
-      { id: '3', name: 'Pausa (5min)', duration: 5, completed: false },
-      { id: '4', name: 'Pomodoro #2 (25min)', duration: 25, completed: false },
-      { id: '5', name: 'Pausa (5min)', duration: 5, completed: false },
-      { id: '6', name: 'Pomodoro #3 (25min)', duration: 25, completed: false },
-    ],
-  },
-  {
-    id: '4',
-    name: 'Autocuidado',
-    icon: '💆',
-    color: 'from-pink-500 to-rose-500',
-    estimatedTime: 60,
-    tasks: [
-      { id: '1', name: 'Banho relaxante', duration: 20, completed: false },
-      { id: '2', name: 'Máscara facial', duration: 15, completed: false },
-      { id: '3', name: 'Música relaxante', duration: 10, completed: false },
-      { id: '4', name: 'Chá calmante', duration: 10, completed: false },
-      { id: '5', name: 'Gratidão (3 coisas)', duration: 5, completed: false },
-    ],
-  },
-];
-
 export function RoutinesSection() {
-  const [routines, setRoutines] = useState(mockRoutines);
+  const { userId } = useAuth();
+  const [routines, setRoutines] = useState<Routine[]>([]);
   const [activeRoutine, setActiveRoutine] = useState<string | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    icon: '⏰',
+    color: 'from-blue-500 to-cyan-500',
+    estimatedTime: 30,
+    tasks: [{ id: '1', name: '', duration: 5, completed: false }] as RoutineTask[],
+  });
+
+  useEffect(() => {
+    loadRoutines();
+  }, [userId]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isTimerRunning) {
+      interval = setInterval(() => {
+        setTimerSeconds(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning]);
+
+  const loadRoutines = async () => {
+    try {
+      const data = await routinesService.getAll(userId);
+      setRoutines(data);
+    } catch (error) {
+      console.error('Erro ao carregar rotinas:', error);
+      toast.error('Erro ao carregar rotinas');
+    }
+  };
+
+  const handleSaveRoutine = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Preencha o nome da rotina');
+      return;
+    }
+    if (formData.tasks.some(t => !t.name.trim())) {
+      toast.error('Preencha todas as tarefas');
+      return;
+    }
+
+    try {
+      await routinesService.create(formData, userId);
+      await loadRoutines();
+      toast.success('Rotina criada com sucesso!');
+      setIsModalOpen(false);
+      setFormData({
+        name: '',
+        icon: '⏰',
+        color: 'from-blue-500 to-cyan-500',
+        estimatedTime: 30,
+        tasks: [{ id: '1', name: '', duration: 5, completed: false }],
+      });
+    } catch (error) {
+      console.error('Erro ao criar rotina:', error);
+      toast.error('Erro ao criar rotina');
+    }
+  };
+
+  const handleDeleteRoutine = async (id: string) => {
+    try {
+      await routinesService.delete(id);
+      await loadRoutines();
+      toast.success('Rotina deletada!');
+    } catch (error) {
+      console.error('Erro ao deletar rotina:', error);
+      toast.error('Erro ao deletar rotina');
+    }
+  };
 
   const toggleTask = (routineId: string, taskId: string) => {
     setRoutines(routines.map(routine => {
@@ -141,10 +161,109 @@ export function RoutinesSection() {
           </h1>
           <p className="text-muted-foreground mt-1">Automatize seu dia com rotinas personalizadas</p>
         </div>
-        <Button className="gradient-primary text-primary-foreground w-full sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Rotina
-        </Button>
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Button className="gradient-cyan text-cyan-foreground w-full sm:w-auto" onClick={() => setIsModalOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Rotina
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Nova Rotina</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome da Rotina</Label>
+                <Input
+                  id="name"
+                  placeholder="Ex: Rotina Matinal"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="icon">Ícone</Label>
+                  <Input
+                    id="icon"
+                    placeholder="⏰"
+                    value={formData.icon}
+                    onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="time">Tempo Estimado (min)</Label>
+                  <Input
+                    id="time"
+                    type="number"
+                    value={formData.estimatedTime}
+                    onChange={(e) => setFormData({ ...formData, estimatedTime: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Tarefas</Label>
+                {formData.tasks.map((task, index) => (
+                  <div key={task.id} className="flex gap-2">
+                    <Input
+                      placeholder={`Tarefa ${index + 1}`}
+                      value={task.name}
+                      onChange={(e) => {
+                        const newTasks = [...formData.tasks];
+                        newTasks[index].name = e.target.value;
+                        setFormData({ ...formData, tasks: newTasks });
+                      }}
+                    />
+                    <Input
+                      type="number"
+                      placeholder="min"
+                      className="w-20"
+                      value={task.duration}
+                      onChange={(e) => {
+                        const newTasks = [...formData.tasks];
+                        newTasks[index].duration = parseInt(e.target.value) || 0;
+                        setFormData({ ...formData, tasks: newTasks });
+                      }}
+                    />
+                    {formData.tasks.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setFormData({ ...formData, tasks: formData.tasks.filter((_, i) => i !== index) });
+                        }}
+                      >
+                        ×
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      tasks: [...formData.tasks, { id: Date.now().toString(), name: '', duration: 5, completed: false }],
+                    });
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar Tarefa
+                </Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveRoutine}>
+                Criar Rotina
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Timer Card */}
@@ -200,7 +319,7 @@ export function RoutinesSection() {
           const isActive = activeRoutine === routine.id;
           
           return (
-            <Card key={routine.id} className={cn("transition-all", isActive && "ring-2 ring-primary")}>
+            <Card key={routine.id} className={cn("transition-all group", isActive && "ring-2 ring-primary")}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -218,16 +337,31 @@ export function RoutinesSection() {
                       </p>
                     </div>
                   </div>
-                  {!isActive && (
-                    <Button 
-                      size="sm" 
-                      onClick={() => startRoutine(routine.id)}
-                      className="gradient-primary text-primary-foreground"
-                    >
-                      <Play className="w-4 h-4 mr-1" />
-                      Iniciar
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {!isActive && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => startRoutine(routine.id)}
+                        className="gradient-cyan text-cyan-foreground"
+                      >
+                        <Play className="w-4 h-4 mr-1" />
+                        Iniciar
+                      </Button>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleDeleteRoutine(routine.id)} className="text-destructive">
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Deletar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
                 <Progress value={progress} className="h-2 mt-3" />
                 <p className="text-xs text-muted-foreground mt-1">

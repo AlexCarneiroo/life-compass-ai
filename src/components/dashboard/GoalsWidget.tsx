@@ -1,21 +1,51 @@
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { mockGoals } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
-import { ChevronRight, Target } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { goalsService } from '@/lib/firebase/goals';
+import { Goal } from '@/types';
 
 export function GoalsWidget() {
+  const { userId } = useAuth();
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadGoals();
+  }, [userId]);
+
+  const loadGoals = async () => {
+    try {
+      setLoading(true);
+      const data = await goalsService.getAll(userId);
+      setGoals(data);
+    } catch (error) {
+      console.error('Erro ao carregar metas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <span>⭐</span> Metas em Andamento
           </CardTitle>
-          <span className="text-sm text-muted-foreground">{mockGoals.length} ativas</span>
+          <span className="text-sm text-muted-foreground">{goals.length} ativas</span>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {mockGoals.map((goal) => {
+        {loading ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Carregando metas...</p>
+        ) : goals.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Nenhuma meta ainda. Crie sua primeira meta!
+          </p>
+        ) : (
+          goals.map((goal) => {
           const completedSubtasks = goal.subtasks.filter(s => s.completed).length;
           const totalSubtasks = goal.subtasks.length;
           
@@ -39,8 +69,8 @@ export function GoalsWidget() {
                   className={cn(
                     "h-full rounded-full transition-all duration-500",
                     goal.progress >= 70 ? "gradient-success" : 
-                    goal.progress >= 40 ? "gradient-primary" : 
-                    "gradient-accent"
+                    goal.progress >= 40 ? "gradient-blue" : 
+                    "gradient-orange"
                   )}
                   style={{ width: `${goal.progress}%` }}
                 />
@@ -56,7 +86,7 @@ export function GoalsWidget() {
               </div>
             </div>
           );
-        })}
+        }))}
       </CardContent>
     </Card>
   );

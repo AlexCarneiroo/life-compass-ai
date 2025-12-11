@@ -1,33 +1,429 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { mockHabits, mockUserStats } from '@/lib/mockData';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/hooks/useAuth';
+import { userStatsService, checkAndGrantBadges } from '@/lib/firebase/userStats';
+import { habitsService } from '@/lib/firebase/habits';
+import { Habit, Badge } from '@/types';
 import { cn } from '@/lib/utils';
-import { Check, Flame, Plus, Trophy, Target, Star, Zap } from 'lucide-react';
+import { 
+  getHabitColor, 
+  canCompleteToday, 
+  calculateStreak, 
+  getLast7Days, 
+  isCompletedOnDate 
+} from '@/lib/utils/habits';
+import { Check, Flame, Plus, Trophy, Target, Star, Zap, MoreVertical, Edit, Trash2, Lock, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
+import { DisciplineSimulator } from './DisciplineSimulator';
+import { disciplineChallengeService, DisciplineChallenge } from '@/lib/firebase/disciplineChallenge';
+import { Badge as UIBadge } from '@/components/ui/badge';
+
+// Componente para exibir contagem de badges
+function BadgeCount({ userId }: { userId: string }) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    userStatsService.getOrCreate(userId).then(stats => {
+      setCount(stats.badges.length);
+    });
+  }, [userId]);
+
+  return (
+    <>
+      <p className="text-2xl font-bold">{count}</p>
+      <p className="text-sm text-muted-foreground">Conquistas</p>
+    </>
+  );
+}
+
+// Componente para exibir badges
+function BadgesDisplay({ userId }: { userId: string }) {
+  const [badges, setBadges] = useState<Badge[]>([]);
+
+  useEffect(() => {
+    userStatsService.getOrCreate(userId).then(stats => {
+      setBadges(stats.badges);
+    });
+  }, [userId]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-warning" />
+          Suas Conquistas
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {badges.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Complete hábitos para desbloquear conquistas! 🏆
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {badges.map((badge) => (
+              <div 
+                key={badge.id}
+                className="flex flex-col items-center p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+              >
+                <span className="text-4xl mb-2">{badge.icon}</span>
+                <p className="font-semibold text-sm text-center">{badge.name}</p>
+                <p className="text-xs text-muted-foreground text-center mt-1">{badge.description}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Componente para visualização semanal tipo Duolingo
+function WeeklyView({ habit, habitIndex, onToggle }: { habit: Habit; habitIndex: number; onToggle: (date: string) => void }) {
+  const last7Days = getLast7Days();
+  const habitColor = getHabitColor(habit, habitIndex);
+  const today = new Date().toISOString().split('T')[0];
+
+  return (
+    <div className="flex items-center gap-2 sm:gap-3 justify-between">
+      {last7Days.map((day, index) => {
+        const isCompleted = isCompletedOnDate(habit, day.date);
+        const isToday = day.isToday;
+        const canComplete = canCompleteToday(habit, day.date) || isCompleted;
+        
+        return (
+          <div key={day.date} className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
+            <button
+              onClick={() => {
+                if (canComplete) {
+                  onToggle(day.date);
+                }
+              }}
+              disabled={!canComplete && !isCompleted}
+              className={cn(
+                "w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-all duration-200 flex items-center justify-center relative flex-shrink-0",
+                isCompleted 
+                  ? "shadow-md" 
+                  : canComplete
+                    ? "bg-muted hover:bg-muted/80 cursor-pointer border-2 border-dashed border-muted-foreground/30"
+                    : "bg-muted/50 cursor-not-allowed opacity-50",
+                isToday && "ring-2 ring-offset-2 ring-offset-background",
+                isToday && isCompleted && "ring-primary",
+                isToday && !isCompleted && "ring-muted-foreground/30"
+              )}
+              style={{
+                backgroundColor: isCompleted ? habitColor : undefined,
+              }}
+              title={`${day.dayName} - ${day.date}${isToday ? ' (Hoje)' : ''}`}
+            >
+              {isCompleted ? (
+                <Check className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              ) : !canComplete ? (
+                <Lock className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
+              ) : null}
+            </button>
+            <span className={cn(
+              "text-[10px] sm:text-xs font-medium truncate w-full text-center",
+              isToday ? "text-primary font-bold" : "text-muted-foreground"
+            )}>
+              {day.dayName}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function HabitsSection() {
-  const [completedToday, setCompletedToday] = useState<string[]>(['1', '4']);
+  const { userId } = useAuth();
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [showDisciplineSimulator, setShowDisciplineSimulator] = useState<string | null>(null);
+  const [activeChallenges, setActiveChallenges] = useState<Record<string, DisciplineChallenge>>({});
+  const [formData, setFormData] = useState({
+    name: '',
+    icon: '🎯',
+    frequency: 'daily' as 'daily' | 'weekly' | 'monthly',
+    category: 'Bem-estar',
+    xp: 100,
+    color: '',
+  });
 
-  const categories = ['all', ...new Set(mockHabits.map(h => h.category))];
+  const categories = ['all', ...new Set(habits.map(h => h.category))];
   
   const filteredHabits = selectedCategory === 'all' 
-    ? mockHabits 
-    : mockHabits.filter(h => h.category === selectedCategory);
+    ? habits 
+    : habits.filter(h => h.category === selectedCategory);
 
-  const toggleHabit = (habitId: string) => {
-    setCompletedToday(prev => 
-      prev.includes(habitId) 
-        ? prev.filter(id => id !== habitId)
-        : [...prev, habitId]
-    );
+  const habitIcons = ['🎯', '🧘', '🏃', '💧', '📚', '📝', '😴', '🍎', '☀️', '💪', '🧠', '❤️', '🎨', '🎵', '🌱'];
+  const habitColors = [
+    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
+    '#EC4899', '#06B6D4', '#F97316', '#84CC16', '#6366F1'
+  ];
+
+  useEffect(() => {
+    if (!userId) return;
+    
+    loadHabits();
+    
+    // Verifica a mudança de dia a cada minuto
+    const dayCheckInterval = setInterval(() => {
+      const today = new Date().toISOString().split('T')[0];
+      const lastCheckDate = localStorage.getItem('lastHabitCheckDate');
+      if (lastCheckDate !== today) {
+        localStorage.setItem('lastHabitCheckDate', today);
+        loadHabits();
+      }
+    }, 60000); // Verifica a cada minuto
+    
+    // Verifica imediatamente se o dia mudou
+    const today = new Date().toISOString().split('T')[0];
+    const lastCheckDate = localStorage.getItem('lastHabitCheckDate');
+    if (lastCheckDate !== today) {
+      localStorage.setItem('lastHabitCheckDate', today);
+      loadHabits();
+    }
+    
+    // Também verifica quando a página ganha foco (usuário volta ao app)
+    const handleFocus = () => {
+      const today = new Date().toISOString().split('T')[0];
+      const lastCheckDate = localStorage.getItem('lastHabitCheckDate');
+      if (lastCheckDate !== today) {
+        localStorage.setItem('lastHabitCheckDate', today);
+        loadHabits();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    
+    // Verifica quando a visibilidade da página muda
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        const today = new Date().toISOString().split('T')[0];
+        const lastCheckDate = localStorage.getItem('lastHabitCheckDate');
+        if (lastCheckDate !== today) {
+          localStorage.setItem('lastHabitCheckDate', today);
+          loadHabits();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(dayCheckInterval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  const loadHabits = async () => {
+    if (!userId) return;
+    
+    try {
+      const data = await habitsService.getAll(userId);
+      // Recalcula streaks baseado na frequência e atualiza no Firebase se necessário
+      const updatedHabits = await Promise.all(
+        data.map(async (habit) => {
+          const calculatedStreak = calculateStreak(habit);
+          // Se o streak calculado for diferente do salvo, atualiza
+          if (calculatedStreak !== habit.streak) {
+            try {
+              await habitsService.update(habit.id, { streak: calculatedStreak });
+            } catch (error) {
+              console.error('Erro ao atualizar streak:', error);
+            }
+          }
+          return {
+            ...habit,
+            streak: calculatedStreak,
+          };
+        })
+      );
+      setHabits(updatedHabits);
+      
+      // Carrega desafios ativos para cada hábito
+      const challenges: Record<string, DisciplineChallenge> = {};
+      await Promise.all(
+        updatedHabits.map(async (habit) => {
+          try {
+            const challenge = await disciplineChallengeService.getActiveForHabit(userId, habit.id);
+            if (challenge && challenge.status === 'active') {
+              challenges[habit.id] = challenge;
+            }
+          } catch (error) {
+            console.error(`Erro ao carregar desafio para hábito ${habit.id}:`, error);
+          }
+        })
+      );
+      setActiveChallenges(challenges);
+    } catch (error) {
+      console.error('Erro ao carregar hábitos:', error);
+      toast.error('Erro ao carregar hábitos');
+    }
   };
 
-  const totalXP = mockHabits.reduce((sum, h) => sum + h.xp, 0);
-  const completedXP = completedToday.reduce((sum, id) => {
-    const habit = mockHabits.find(h => h.id === id);
-    return sum + (habit?.xp || 0);
-  }, 0);
+  const handleOpenModal = (habit?: Habit) => {
+    if (habit) {
+      setEditingHabit(habit);
+      setFormData({
+        name: habit.name,
+        icon: habit.icon,
+        frequency: habit.frequency,
+        category: habit.category,
+        xp: habit.xp,
+        color: habit.color || '',
+      });
+    } else {
+      setEditingHabit(null);
+      setFormData({
+        name: '',
+        icon: '🎯',
+        frequency: 'daily',
+        category: 'Bem-estar',
+        xp: 100,
+        color: '',
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingHabit(null);
+    setFormData({
+      name: '',
+      icon: '🎯',
+      frequency: 'daily',
+      category: 'Bem-estar',
+      xp: 100,
+      color: '',
+    });
+  };
+
+  const handleSaveHabit = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Por favor, preencha o nome do hábito');
+      return;
+    }
+
+    try {
+      const habitData = {
+        name: formData.name,
+        icon: formData.icon,
+        frequency: formData.frequency,
+        category: formData.category,
+        streak: 0,
+        completedDates: [],
+        xp: formData.xp,
+        ...(formData.color && { color: formData.color }),
+      };
+
+      if (editingHabit) {
+        await habitsService.update(editingHabit.id, habitData);
+        await loadHabits();
+        toast.success('Hábito atualizado com sucesso!');
+      } else {
+        await habitsService.create(habitData, userId);
+        await loadHabits();
+        toast.success('Hábito criado com sucesso!');
+      }
+      handleCloseModal();
+    } catch (error) {
+      console.error('Erro ao salvar hábito:', error);
+      toast.error('Erro ao salvar hábito');
+    }
+  };
+
+  const handleDeleteHabit = async (habitId: string) => {
+    try {
+      await habitsService.delete(habitId);
+      await loadHabits();
+      toast.success('Hábito deletado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao deletar hábito:', error);
+      toast.error('Erro ao deletar hábito');
+    }
+  };
+
+  const toggleHabit = async (habitId: string, date: string) => {
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    const isCompleted = isCompletedOnDate(habit, date);
+    const today = new Date().toISOString().split('T')[0];
+    
+    try {
+      if (isCompleted) {
+        // Desmarca
+        await habitsService.unmarkComplete(habitId, date);
+        toast.success('Hábito desmarcado');
+      } else {
+        // Verifica se pode completar
+        if (!canCompleteToday(habit, date)) {
+          const freqText = habit.frequency === 'weekly' ? 'semana' : 'mês';
+          toast.error(`Você já completou este hábito neste ${freqText}!`);
+          return;
+        }
+
+        // Marca como completo
+        await habitsService.markComplete(habitId, date);
+        
+        // Adiciona XP apenas se for hoje
+        if (date === today) {
+          await userStatsService.addXP(userId, habit.xp);
+          await userStatsService.incrementHabitsCompleted(userId);
+          
+          // Verifica e concede badges
+          const stats = await userStatsService.getOrCreate(userId);
+          const updatedHabit = await habitsService.getAll(userId).then(h => h.find(h => h.id === habitId));
+          const maxStreak = updatedHabit?.streak || 0;
+          
+          const newBadges = await checkAndGrantBadges(userId, {
+            habitsCompleted: stats.totalHabitsCompleted + 1,
+            currentStreak: maxStreak,
+            workoutsCompleted: stats.workoutsCompleted || 0,
+            checkInsCompleted: stats.checkInsCompleted || 0,
+          });
+          
+          for (const badge of newBadges) {
+            await userStatsService.addBadge(userId, badge);
+            toast.success(`🏆 Nova conquista: ${badge.name}!`, {
+              description: badge.description,
+              duration: 5000,
+            });
+          }
+          
+          toast.success(`+${habit.xp} XP ganho!`);
+        }
+        
+        // Dispara evento para atualizar stats
+        window.dispatchEvent(new Event('stats-updated'));
+      }
+      
+      await loadHabits();
+    } catch (error) {
+      console.error('Erro ao marcar hábito:', error);
+      toast.error('Erro ao atualizar hábito');
+    }
+  };
+
+  // Função helper para obter a data atual (sempre recalculada)
+  const getToday = () => new Date().toISOString().split('T')[0];
+  
+  const today = getToday();
+  const completedToday = habits.filter(h => isCompletedOnDate(h, today));
+  const totalXP = habits.reduce((sum, h) => sum + h.xp, 0);
+  const completedXP = completedToday.reduce((sum, h) => sum + h.xp, 0);
+  const maxStreak = habits.length > 0 ? Math.max(...habits.map(h => h.streak || 0), 0) : 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -37,33 +433,164 @@ export function HabitsSection() {
           <h1 className="text-3xl font-bold text-foreground">Hábitos</h1>
           <p className="text-muted-foreground mt-1">Construa sua melhor versão, um dia de cada vez</p>
         </div>
-        <Button size="lg">
-          <Plus className="w-5 h-5 mr-2" />
-          Novo Hábito
-        </Button>
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Button size="lg" onClick={() => handleOpenModal()}>
+              <Plus className="w-5 h-5 mr-2" />
+              Novo Hábito
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>{editingHabit ? 'Editar Hábito' : 'Novo Hábito'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome do Hábito</Label>
+                <Input
+                  id="name"
+                  placeholder="Ex: Meditar"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="icon">Ícone</Label>
+                <div className="flex flex-wrap gap-2">
+                  {habitIcons.map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, icon })}
+                      className={cn(
+                        "w-12 h-12 text-2xl rounded-xl border-2 transition-all hover:scale-110",
+                        formData.icon === icon 
+                          ? "border-primary bg-primary/10" 
+                          : "border-muted hover:border-primary/50"
+                      )}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="frequency">Frequência</Label>
+                  <Select
+                    value={formData.frequency}
+                    onValueChange={(value: 'daily' | 'weekly' | 'monthly') => 
+                      setFormData({ ...formData, frequency: value })
+                    }
+                  >
+                    <SelectTrigger id="frequency">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Diário</SelectItem>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                      <SelectItem value="monthly">Mensal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="xp">XP</Label>
+                  <Input
+                    id="xp"
+                    type="number"
+                    min="1"
+                    value={formData.xp}
+                    onChange={(e) => setFormData({ ...formData, xp: parseInt(e.target.value) || 100 })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category">Categoria</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Bem-estar">Bem-estar</SelectItem>
+                    <SelectItem value="Saúde">Saúde</SelectItem>
+                    <SelectItem value="Desenvolvimento">Desenvolvimento</SelectItem>
+                    <SelectItem value="Produtividade">Produtividade</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="color">Cor (opcional)</Label>
+                <div className="flex flex-wrap gap-2">
+                  {habitColors.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, color })}
+                      className={cn(
+                        "w-10 h-10 rounded-lg border-2 transition-all hover:scale-110",
+                        formData.color === color 
+                          ? "border-foreground ring-2 ring-offset-2" 
+                          : "border-muted hover:border-primary/50"
+                      )}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, color: '' })}
+                    className={cn(
+                      "w-10 h-10 rounded-lg border-2 transition-all hover:scale-110 flex items-center justify-center text-xs",
+                      !formData.color 
+                        ? "border-foreground ring-2 ring-offset-2" 
+                        : "border-muted hover:border-primary/50"
+                    )}
+                  >
+                    Auto
+                  </button>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCloseModal}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveHabit}>
+                {editingHabit ? 'Salvar Alterações' : 'Criar Hábito'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card variant="gradient" className="p-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
-              <Flame className="w-6 h-6 text-primary-foreground" />
+            <div className="w-12 h-12 rounded-xl gradient-orange flex items-center justify-center">
+              <Flame className="w-6 h-6 text-orange-foreground" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{mockUserStats.currentStreak}</p>
-              <p className="text-sm text-muted-foreground">Dias em sequência</p>
+              <p className="text-2xl font-bold">{maxStreak}</p>
+              <p className="text-sm text-muted-foreground">Maior sequência</p>
             </div>
           </div>
         </Card>
         
         <Card variant="gradient" className="p-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl gradient-accent flex items-center justify-center">
-              <Target className="w-6 h-6 text-accent-foreground" />
+            <div className="w-12 h-12 rounded-xl gradient-blue flex items-center justify-center">
+              <Target className="w-6 h-6 text-blue-foreground" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{completedToday.length}/{mockHabits.length}</p>
+              <p className="text-2xl font-bold">{completedToday.length}/{habits.length}</p>
               <p className="text-sm text-muted-foreground">Completados hoje</p>
             </div>
           </div>
@@ -83,13 +610,10 @@ export function HabitsSection() {
         
         <Card variant="gradient" className="p-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl gradient-energy flex items-center justify-center">
-              <Trophy className="w-6 h-6 text-energy-foreground" />
+            <div className="w-12 h-12 rounded-xl gradient-indigo flex items-center justify-center">
+              <Trophy className="w-6 h-6 text-indigo-foreground" />
             </div>
-            <div>
-              <p className="text-2xl font-bold">{mockUserStats.badges.length}</p>
-              <p className="text-sm text-muted-foreground">Conquistas</p>
-            </div>
+            <BadgeCount userId={userId} />
           </div>
         </Card>
       </div>
@@ -100,13 +624,13 @@ export function HabitsSection() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-lg">Progresso de Hoje</h3>
             <span className="text-sm text-muted-foreground">
-              {Math.round((completedToday.length / mockHabits.length) * 100)}%
+              {habits.length > 0 ? Math.round((completedToday.length / habits.length) * 100) : 0}%
             </span>
           </div>
           <div className="w-full h-4 bg-muted rounded-full overflow-hidden">
             <div 
               className="h-full gradient-primary transition-all duration-500 rounded-full"
-              style={{ width: `${(completedToday.length / mockHabits.length) * 100}%` }}
+              style={{ width: `${habits.length > 0 ? (completedToday.length / habits.length) * 100 : 0}%` }}
             />
           </div>
           <div className="flex items-center gap-2 mt-3">
@@ -132,84 +656,212 @@ export function HabitsSection() {
         ))}
       </div>
 
-      {/* Habits Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredHabits.map((habit) => {
-          const isCompleted = completedToday.includes(habit.id);
+      {/* Habits Grid com Visualização Semanal */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {filteredHabits.map((habit, index) => {
+          const habitColor = getHabitColor(habit, index);
+          const isCompletedToday = isCompletedOnDate(habit, today);
+          const canComplete = canCompleteToday(habit);
+          const activeChallenge = activeChallenges[habit.id];
+          
           return (
             <Card
               key={habit.id}
               className={cn(
-                "p-5 cursor-pointer transition-all duration-300 hover:shadow-lg",
-                isCompleted && "ring-2 ring-success bg-success/5"
+                "p-4 sm:p-5 transition-all duration-300 hover:shadow-lg relative group",
+                isCompletedToday && "ring-2 ring-success bg-success/5"
               )}
-              onClick={() => toggleHabit(habit.id)}
             >
-              <div className="flex items-center gap-4">
-                <div className={cn(
-                  "w-14 h-14 rounded-xl flex items-center justify-center text-3xl transition-all",
-                  isCompleted ? "bg-success/20" : "bg-muted"
-                )}>
-                  {habit.icon}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className={cn(
-                      "font-semibold text-lg",
-                      isCompleted && "line-through text-muted-foreground"
-                    )}>
-                      {habit.name}
-                    </h4>
-                    {isCompleted && <Check className="w-5 h-5 text-success" />}
+              <div className="space-y-4">
+                {/* Header do Hábito */}
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div 
+                    className={cn(
+                      "w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center text-2xl sm:text-3xl transition-all cursor-pointer flex-shrink-0",
+                      isCompletedToday ? "bg-success/20" : "bg-muted"
+                    )}
+                    onClick={() => toggleHabit(habit.id, getToday())}
+                    style={isCompletedToday ? { backgroundColor: `${habitColor}20` } : undefined}
+                  >
+                    {habit.icon}
                   </div>
-                  <div className="flex items-center gap-4 mt-1">
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Flame className="w-4 h-4 text-accent" />
-                      <span>{habit.streak} dias</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className={cn(
+                        "font-semibold text-base sm:text-lg",
+                        isCompletedToday && "line-through text-muted-foreground"
+                      )}>
+                        {habit.name}
+                      </h4>
+                      {isCompletedToday && <Check className="w-4 h-4 sm:w-5 sm:h-5 text-success flex-shrink-0" />}
+                      {activeChallenge && (
+                        <UIBadge variant="default" className="bg-primary/20 text-primary border-primary/30 text-xs flex items-center gap-1">
+                          <Target className="w-3 h-3" />
+                          Desafio Ativo
+                        </UIBadge>
+                      )}
                     </div>
-                    <span className="text-sm text-primary font-medium">+{habit.xp} XP</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      {habit.frequency === 'daily' ? 'Diário' : habit.frequency === 'weekly' ? 'Semanal' : 'Mensal'}
+                    <div className="flex items-center gap-2 sm:gap-4 mt-1 flex-wrap">
+                      <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
+                        <Flame className="w-3 h-3 sm:w-4 sm:h-4 text-accent" />
+                        <span>{habit.streak} {habit.frequency === 'daily' ? 'dias' : habit.frequency === 'weekly' ? 'semanas' : 'meses'}</span>
+                      </div>
+                      <span className="text-xs sm:text-sm text-primary font-medium">+{habit.xp} XP</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                        {habit.frequency === 'daily' ? 'Diário' : habit.frequency === 'weekly' ? 'Semanal' : 'Mensal'}
+                      </span>
+                      {!canComplete && !isCompletedToday && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-warning/20 text-warning">
+                          Já completado {habit.frequency === 'weekly' ? 'esta semana' : 'este mês'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div 
+                      className={cn(
+                        "w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer",
+                        isCompletedToday 
+                          ? "bg-success border-success text-success-foreground" 
+                          : "border-muted-foreground/30 hover:border-primary"
+                      )}
+                      onClick={() => toggleHabit(habit.id, getToday())}
+                      style={isCompletedToday ? { 
+                        backgroundColor: habitColor, 
+                        borderColor: habitColor 
+                      } : undefined}
+                    >
+                      {isCompletedToday && <Check className="w-4 h-4 sm:w-5 sm:h-5 text-white" />}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-7 w-7 sm:h-8 sm:w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenModal(habit);
+                        }}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          <div className="flex flex-col">
+                            <span>Editar Hábito</span>
+                            <span className="text-xs text-muted-foreground">Alterar nome, ícone, frequência</span>
+                          </div>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteHabit(habit.id);
+                          }}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          <div className="flex flex-col">
+                            <span>Deletar Hábito</span>
+                            <span className="text-xs text-muted-foreground">Remover permanentemente</span>
+                          </div>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                {/* Botão de Desafio */}
+                {activeChallenge ? (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Target className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium">Desafio de {activeChallenge.duration} dias ativo</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {activeChallenge.completedDays.length} / {activeChallenge.duration} dias completados
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowDisciplineSimulator(habit.id)}
+                      className="flex-shrink-0"
+                    >
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      Ver
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDisciplineSimulator(habit.id)}
+                    className="w-full sm:w-auto"
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Iniciar Desafio
+                  </Button>
+                )}
+
+                {/* Visualização Semanal */}
+                <div className="border-t pt-3 sm:pt-4">
+                  <div className="flex items-center justify-between mb-2 sm:mb-3 flex-wrap gap-2">
+                    <span className="text-xs sm:text-sm font-medium text-muted-foreground">Últimos 7 dias</span>
+                    <span className="text-xs text-muted-foreground">
+                      {habit.completedDates?.filter(d => {
+                        const date = new Date(d);
+                        const weekAgo = new Date();
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        return date >= weekAgo;
+                      }).length || 0} completados
                     </span>
                   </div>
+                  <WeeklyView habit={habit} habitIndex={index} onToggle={(date) => toggleHabit(habit.id, date)} />
                 </div>
-                <div className={cn(
-                  "w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all",
-                  isCompleted 
-                    ? "bg-success border-success text-success-foreground" 
-                    : "border-muted-foreground/30 hover:border-primary"
-                )}>
-                  {isCompleted && <Check className="w-5 h-5" />}
-                </div>
+
               </div>
             </Card>
           );
         })}
       </div>
 
+      {filteredHabits.length === 0 && (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <p className="text-muted-foreground">Nenhum hábito encontrado. Crie seu primeiro hábito!</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Badges Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-warning" />
-            Suas Conquistas
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {mockUserStats.badges.map((badge) => (
-              <div 
-                key={badge.id}
-                className="flex flex-col items-center p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
-              >
-                <span className="text-4xl mb-2">{badge.icon}</span>
-                <p className="font-semibold text-sm text-center">{badge.name}</p>
-                <p className="text-xs text-muted-foreground text-center mt-1">{badge.description}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <BadgesDisplay userId={userId} />
+
+      {/* Modal do Simulador de Disciplina */}
+      {showDisciplineSimulator && (
+        <Dialog open={!!showDisciplineSimulator} onOpenChange={(open) => !open && setShowDisciplineSimulator(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                Simulador de Disciplina
+              </DialogTitle>
+            </DialogHeader>
+            {habits.find(h => h.id === showDisciplineSimulator) && (
+              <DisciplineSimulator 
+                habit={habits.find(h => h.id === showDisciplineSimulator)!} 
+                onChallengeUpdate={async () => {
+                  await loadHabits();
+                  setShowDisciplineSimulator(null);
+                }} 
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

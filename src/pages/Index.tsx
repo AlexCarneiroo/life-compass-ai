@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { MobileNav } from '@/components/layout/MobileNav';
@@ -27,8 +28,8 @@ const Index = () => {
         return <HabitsSection />;
       case 'checkin':
         return <CheckinSection />;
-      case 'mood':
-        return <MoodSection />;
+      // case 'mood':
+      //   return <MoodSection />; // Arquivado
       case 'finance':
         return <FinanceSection />;
       case 'goals':
@@ -39,8 +40,8 @@ const Index = () => {
         return <RoutinesSection />;
       case 'journal':
         return <JournalSection />;
-      case 'work':
-        return <WorkSection />;
+      // case 'work':
+      //   return <WorkSection />; // Arquivado
       case 'ai':
         return <AICoachSection />;
       case 'reports':
@@ -63,14 +64,24 @@ const Index = () => {
       <div className={cn(
         "transition-all duration-300",
         "lg:ml-64", // Desktop sidebar margin
-        "pt-14 pb-20 lg:pt-0 lg:pb-0" // Mobile header/footer padding
+        "pt-14 pb-16 lg:pt-0 lg:pb-0" // Mobile header/footer padding (reduzido para h-16 do menu)
       )}>
         <div className="hidden lg:block">
           <Header />
         </div>
         
-        <main className="p-4 sm:p-6">
-          {renderSection()}
+        <main className="p-4 sm:p-6 lg:p-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeSection}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {renderSection()}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

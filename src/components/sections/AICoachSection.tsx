@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,44 +10,22 @@ import {
   Lightbulb,
   MessageSquare,
   Send,
-  Zap,
-  Target,
-  Heart
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { aiService } from '@/lib/ai/openai';
+import { checkinService } from '@/lib/firebase/checkin';
+import { habitsService } from '@/lib/firebase/habits';
+import { financeService } from '@/lib/firebase/finance';
+import { healthService } from '@/lib/firebase/health';
+import { goalsService } from '@/lib/firebase/goals';
+import { toast } from 'sonner';
 
-const insights = [
-  {
-    type: 'positive',
-    icon: '📈',
-    title: 'Produtividade em alta!',
-    description: 'Sua produtividade aumentou 23% quando você dormiu mais de 7h. Continue assim!',
-  },
-  {
-    type: 'warning',
-    icon: '⚠️',
-    title: 'Padrão identificado',
-    description: 'Você gasta 35% mais nos finais de semana. Considere criar um orçamento específico.',
-  },
-  {
-    type: 'tip',
-    icon: '💡',
-    title: 'Dica personalizada',
-    description: 'Baseado nos seus dados, treinar pela manhã melhora seu humor em 40%.',
-  },
-  {
-    type: 'positive',
-    icon: '🎯',
-    title: 'Meta próxima!',
-    description: 'Você está a apenas 15% de completar sua meta de economia. Faltam R$ 1.500!',
-  },
-];
-
-const chatHistory = [
-  { role: 'ai', message: 'Olá! Sou seu coach pessoal de IA. Como posso ajudar você hoje?' },
-  { role: 'user', message: 'Como posso melhorar minha produtividade?' },
-  { role: 'ai', message: 'Analisando seus dados dos últimos 30 dias, identifiquei alguns padrões interessantes:\n\n1. Você é 45% mais produtivo nas terças e quartas\n2. Sua produtividade cai após reuniões longas\n3. Dias com exercício têm 30% mais tarefas concluídas\n\nSugestão: Agende suas tarefas mais importantes para terça/quarta pela manhã, antes das reuniões.' },
-];
+interface ChatMessage {
+  role: 'user' | 'ai';
+  message: string;
+}
 
 const modes = [
   { id: 'therapy', name: 'Modo Terapia', icon: '🧘', desc: 'Autoconhecimento e reflexão', color: 'from-purple-500 to-pink-500' },
@@ -57,22 +35,121 @@ const modes = [
 ];
 
 export function AICoachSection() {
+  const { userId } = useAuth();
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const [chat, setChat] = useState(chatHistory);
+  const [chat, setChat] = useState<ChatMessage[]>([
+    { 
+      role: 'ai', 
+      message: 'Olá! Sou seu coach pessoal de IA. Como posso ajudar você hoje? Posso analisar seus dados e dar sugestões personalizadas sobre produtividade, sono, hábitos, finanças e muito mais!' 
+    }
+  ]);
+  const [loading, setLoading] = useState(false);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [weeklyAnalysis, setWeeklyAnalysis] = useState<{
+    achievements: string[];
+    improvements: string[];
+    recommendation: string;
+  } | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const sendMessage = () => {
-    if (!message.trim()) return;
-    setChat([...chat, { role: 'user', message }]);
-    setMessage('');
-    // Simulate AI response
-    setTimeout(() => {
-      setChat(prev => [...prev, {
-        role: 'ai',
-        message: 'Obrigado pela pergunta! Estou analisando seus dados para dar a melhor resposta possível...'
-      }]);
-    }, 1000);
+  useEffect(() => {
+    loadWeeklyAnalysis();
+  }, [userId]);
+
+  useEffect(() => {
+    // Scroll to bottom when new message arrives
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chat]);
+
+  const loadWeeklyAnalysis = async () => {
+    setLoadingAnalysis(true);
+    try {
+      const [checkIns, habits, finances, workouts, goals] = await Promise.all([
+        checkinService.getAll(userId),
+        habitsService.getAll(userId),
+        financeService.getAll(userId),
+        healthService.getAllWorkouts(userId),
+        goalsService.getAll(userId),
+      ]);
+
+      const userData = {
+        checkIns,
+        habits,
+        finances,
+        workouts,
+        goals,
+        health: [],
+      };
+
+      const analysis = await aiService.generateWeeklyAnalysis(userData);
+      setWeeklyAnalysis(analysis);
+    } catch (error) {
+      console.error('Erro ao carregar análise:', error);
+      toast.error('Erro ao gerar análise semanal');
+    } finally {
+      setLoadingAnalysis(false);
+    }
   };
+
+  const sendMessage = async () => {
+    if (!message.trim() || loading) return;
+
+    const userMessage = message.trim();
+    setChat(prev => [...prev, { role: 'user', message: userMessage }]);
+    setMessage('');
+    setLoading(true);
+
+    try {
+      // Carrega dados do usuário para contexto
+      const [checkIns, habits, finances, workouts, goals] = await Promise.all([
+        checkinService.getAll(userId),
+        habitsService.getAll(userId),
+        financeService.getAll(userId),
+        healthService.getAllWorkouts(userId),
+        goalsService.getAll(userId),
+      ]);
+
+      const userData = {
+        checkIns,
+        habits,
+        finances,
+        workouts,
+        goals,
+        health: [],
+      };
+
+      // Converte histórico do chat para formato da API
+      const messages = [
+        ...chat.map(m => ({
+          role: m.role === 'user' ? 'user' as const : 'assistant' as const,
+          content: m.message,
+        })),
+        { role: 'user' as const, content: userMessage },
+      ];
+
+      const response = await aiService.chat(messages, userData);
+      setChat(prev => [...prev, { role: 'ai', message: response }]);
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      toast.error('Erro ao processar sua mensagem');
+      setChat(prev => [...prev, { 
+        role: 'ai', 
+        message: 'Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente.' 
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const quickQuestions = [
+    'Como posso dormir melhor?',
+    'Analise meus gastos',
+    'Sugira uma rotina',
+    'Como melhorar meu humor?',
+    'Dicas de produtividade',
+    'Como criar hábitos?',
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -81,7 +158,19 @@ export function AICoachSection() {
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2">
           <span>🤖</span> IA Coach Pessoal
         </h1>
-        <p className="text-muted-foreground mt-1">Seu assistente inteligente para análises e sugestões</p>
+        <p className="text-muted-foreground mt-1">
+          Seu assistente inteligente para análises e sugestões personalizadas
+          {!import.meta.env.VITE_HUGGINGFACE_API_KEY && !import.meta.env.VITE_OPENAI_API_KEY && (
+            <span className="text-xs block mt-1 text-orange-500">
+              💡 Dica: Configure VITE_HUGGINGFACE_API_KEY ou VITE_OPENAI_API_KEY no .env para usar IA completa
+            </span>
+          )}
+          {(import.meta.env.VITE_HUGGINGFACE_API_KEY || import.meta.env.VITE_OPENAI_API_KEY) && (
+            <span className="text-xs block mt-1 text-green-500">
+              ✅ IA ativada - {import.meta.env.VITE_HUGGINGFACE_API_KEY ? 'Hugging Face' : 'OpenAI'}
+            </span>
+          )}
+        </p>
       </div>
 
       {/* AI Modes */}
@@ -109,27 +198,79 @@ export function AICoachSection() {
         ))}
       </div>
 
-      {/* Insights Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {insights.map((insight, index) => (
-          <Card key={index} className={cn(
-            "border-l-4",
-            insight.type === 'positive' && "border-l-green-500",
-            insight.type === 'warning' && "border-l-orange-500",
-            insight.type === 'tip' && "border-l-blue-500"
-          )}>
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">{insight.icon}</span>
-                <div>
-                  <h4 className="font-semibold">{insight.title}</h4>
-                  <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
+      {/* Weekly Analysis */}
+      <Card className="gradient-card border-primary/20">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Análise Semanal Automática
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadWeeklyAnalysis}
+              disabled={loadingAnalysis}
+            >
+              {loadingAnalysis ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Analisando...
+                </>
+              ) : (
+                'Atualizar'
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingAnalysis ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : weeklyAnalysis ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-green-500" />
+                  <h4 className="font-semibold">O que funcionou</h4>
                 </div>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  {weeklyAnalysis.achievements.map((achievement, index) => (
+                    <li key={index}>✓ {achievement}</li>
+                  ))}
+                </ul>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-orange-500" />
+                  <h4 className="font-semibold">Pontos de atenção</h4>
+                </div>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  {weeklyAnalysis.improvements.map((improvement, index) => (
+                    <li key={index}>⚠ {improvement}</li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="w-5 h-5 text-yellow-500" />
+                  <h4 className="font-semibold">Recomendação</h4>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  💡 {weeklyAnalysis.recommendation}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Clique em "Atualizar" para gerar uma análise dos seus dados
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Chat Interface */}
       <Card>
@@ -166,6 +307,17 @@ export function AICoachSection() {
                 </div>
               </div>
             ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-muted p-3 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    <span className="text-sm text-muted-foreground">Pensando...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
           </div>
 
           {/* Input */}
@@ -175,6 +327,7 @@ export function AICoachSection() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               className="min-h-[50px] max-h-[100px] resize-none"
+              disabled={loading}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -185,78 +338,30 @@ export function AICoachSection() {
             <Button 
               onClick={sendMessage}
               className="gradient-primary text-primary-foreground px-4"
+              disabled={loading || !message.trim()}
             >
-              <Send className="w-4 h-4" />
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </Button>
           </div>
 
           {/* Quick Questions */}
           <div className="flex flex-wrap gap-2">
-            {[
-              'Como posso dormir melhor?',
-              'Analise meus gastos',
-              'Sugira uma rotina',
-              'Como melhorar meu humor?',
-            ].map((question, index) => (
+            {quickQuestions.map((question, index) => (
               <Button
                 key={index}
                 variant="outline"
                 size="sm"
                 onClick={() => setMessage(question)}
+                disabled={loading}
                 className="text-xs"
               >
                 {question}
               </Button>
             ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Weekly Analysis */}
-      <Card className="gradient-card border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Análise Semanal Automática
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-green-500" />
-                <h4 className="font-semibold">O que funcionou</h4>
-              </div>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>✓ Meditação 5x esta semana</li>
-                <li>✓ Gastou 20% menos</li>
-                <li>✓ Dormiu média de 7.5h</li>
-              </ul>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-orange-500" />
-                <h4 className="font-semibold">Pontos de atenção</h4>
-              </div>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>⚠ Pulou exercício 2 dias</li>
-                <li>⚠ Humor abaixo na quinta</li>
-                <li>⚠ Menos água no fim de semana</li>
-              </ul>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="w-5 h-5 text-yellow-500" />
-                <h4 className="font-semibold">Sugestões</h4>
-              </div>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>💡 Agende treino para quinta</li>
-                <li>💡 Configure lembrete de água</li>
-                <li>💡 Tente dormir 30min mais cedo</li>
-              </ul>
-            </div>
           </div>
         </CardContent>
       </Card>

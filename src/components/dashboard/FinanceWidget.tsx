@@ -1,28 +1,73 @@
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { mockFinancialEntries, mockWeeklyData, expenseCategories } from '@/lib/mockData';
-import { ArrowDownRight, ArrowUpRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { expenseCategories } from '@/lib/mockData';
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from 'recharts';
+import { useAuth } from '@/hooks/useAuth';
+import { financeService } from '@/lib/firebase/finance';
+import { FinancialEntry } from '@/types';
 
 export function FinanceWidget() {
-  const totalIncome = mockFinancialEntries
+  const { userId } = useAuth();
+  const [entries, setEntries] = useState<FinancialEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadEntries();
+  }, [userId]);
+
+  const loadEntries = async () => {
+    try {
+      setLoading(true);
+      const data = await financeService.getAll(userId);
+      setEntries(data);
+    } catch (error) {
+      console.error('Erro ao carregar transações:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalIncome = entries
     .filter(e => e.type === 'income')
     .reduce((sum, e) => sum + e.amount, 0);
   
-  const totalExpenses = mockFinancialEntries
+  const totalExpenses = entries
     .filter(e => e.type === 'expense')
     .reduce((sum, e) => sum + e.amount, 0);
 
   const balance = totalIncome - totalExpenses;
 
-  const weeklyData = mockWeeklyData.days.map((day, index) => ({
-    day,
-    value: mockWeeklyData.expenses[index],
-  }));
+  // Gera dados da semana (últimos 7 dias)
+  const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normaliza para início do dia
+  
+  const weeklyData = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    const dateStr = date.toISOString().split('T')[0];
+    
+    // Busca todas as despesas deste dia
+    const dayEntries = entries.filter(e => {
+      const entryDate = String(e.date).split('T')[0];
+      return entryDate === dateStr && e.type === 'expense';
+    });
+    
+    const dayExpenses = dayEntries.reduce((sum, e) => sum + e.amount, 0);
+    const dayName = days[date.getDay()];
+    
+    return { 
+      day: dayName, 
+      value: dayExpenses,
+      date: dateStr 
+    };
+  });
 
-  const recentTransactions = mockFinancialEntries.slice(0, 4);
+  const recentTransactions = entries.slice(0, 4);
 
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <span>💰</span> Financeiro
@@ -50,32 +95,45 @@ export function FinanceWidget() {
         {/* Weekly Expenses Chart */}
         <div>
           <p className="text-sm text-muted-foreground mb-2">Gastos da semana</p>
-          <div className="h-16">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyData}>
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {weeklyData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={index === weeklyData.length - 1 ? 'hsl(175, 70%, 45%)' : 'hsl(var(--muted))'} 
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {loading ? (
+            <div className="h-16 flex items-center justify-center">
+              <p className="text-xs text-muted-foreground">Carregando...</p>
+            </div>
+          ) : (
+            <div className="h-16">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weeklyData}>
+                  <XAxis 
+                    dataKey="day" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                  />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {weeklyData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={index === weeklyData.length - 1 
+                          ? 'hsl(175, 70%, 45%)' 
+                          : 'hsl(var(--muted))'} 
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
         {/* Recent Transactions */}
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">Transações recentes</p>
-          {recentTransactions.map((transaction) => {
+          {loading ? (
+            <p className="text-xs text-muted-foreground text-center py-2">Carregando...</p>
+          ) : recentTransactions.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-2">Nenhuma transação ainda</p>
+          ) : (
+            recentTransactions.map((transaction) => {
             const category = expenseCategories.find(c => c.name === transaction.category);
             return (
               <div key={transaction.id} className="flex items-center justify-between py-2">
@@ -93,7 +151,7 @@ export function FinanceWidget() {
                 </span>
               </div>
             );
-          })}
+          }))}
         </div>
       </CardContent>
     </Card>

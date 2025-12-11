@@ -7,7 +7,8 @@ export interface DailyCheckIn {
   productivity: number;
   expenses: number;
   workout: boolean;
-  waterGlasses: number;
+  waterGlasses?: number; // Mantido para compatibilidade
+  waterLiters?: number; // Novo campo em litros
   sleepHours: number;
   reflection: string;
   moodReason?: string;
@@ -22,6 +23,7 @@ export interface Habit {
   completedDates: string[];
   xp: number;
   category: string;
+  color?: string; // Cor personalizada do hábito (hex)
 }
 
 export interface FinancialEntry {
@@ -53,8 +55,11 @@ export interface HealthEntry {
   id: string;
   date: string;
   weight?: number;
+  height?: number; // altura em metros
+  bmi?: number; // IMC calculado e armazenado
   waterIntake: number;
   sleepHours: number;
+  steps?: number;
   workout?: WorkoutEntry;
 }
 
@@ -72,6 +77,8 @@ export interface UserStats {
   currentStreak: number;
   longestStreak: number;
   badges: Badge[];
+  checkInsCompleted?: number;
+  workoutsCompleted?: number;
 }
 
 export interface Badge {

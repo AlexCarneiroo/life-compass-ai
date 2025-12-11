@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
@@ -12,7 +13,7 @@ interface StatsCardProps {
     value: number;
     isPositive: boolean;
   };
-  variant?: 'default' | 'primary' | 'accent' | 'success' | 'energy';
+  variant?: 'default' | 'primary' | 'accent' | 'success' | 'energy' | 'blue' | 'orange' | 'pink' | 'cyan' | 'indigo';
   className?: string;
 }
 
@@ -28,10 +29,15 @@ export function StatsCard({
 }: StatsCardProps) {
   const gradientClasses = {
     default: 'bg-card',
-    primary: 'gradient-primary',
-    accent: 'gradient-accent',
-    success: 'gradient-success',
-    energy: 'gradient-energy',
+    primary: 'gradient-primary', // Purple
+    accent: 'gradient-accent', // Blue
+    success: 'gradient-success', // Green
+    energy: 'gradient-energy', // Orange
+    blue: 'gradient-blue', // Blue
+    orange: 'gradient-orange', // Orange
+    pink: 'gradient-pink', // Pink
+    cyan: 'gradient-cyan', // Cyan
+    indigo: 'gradient-indigo', // Indigo
   };
 
   const textClasses = {
@@ -40,20 +46,32 @@ export function StatsCard({
     accent: 'text-accent-foreground',
     success: 'text-success-foreground',
     energy: 'text-energy-foreground',
+    blue: 'text-blue-foreground',
+    orange: 'text-orange-foreground',
+    pink: 'text-pink-foreground',
+    cyan: 'text-cyan-foreground',
+    indigo: 'text-indigo-foreground',
   };
 
   const isGradient = variant !== 'default';
 
   return (
-    <Card 
-      variant={isGradient ? undefined : 'default'}
-      className={cn(
-        "p-5 card-hover",
-        isGradient && gradientClasses[variant],
-        isGradient && "shadow-md border-0",
-        className
-      )}
+    <motion.div
+      whileHover={{ scale: 1.02, y: -4 }}
+      whileTap={{ scale: 0.98 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
     >
+      <Card 
+        variant={isGradient ? undefined : 'default'}
+        className={cn(
+          "p-5 card-hover rounded-xl",
+          isGradient && gradientClasses[variant],
+          isGradient && "shadow-lg border-0",
+          className
+        )}
+      >
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className={cn(
@@ -98,5 +116,6 @@ export function StatsCard({
         )}
       </div>
     </Card>
+    </motion.div>
   );
 }

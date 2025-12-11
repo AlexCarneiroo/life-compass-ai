@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Plus, 
   ChevronRight, 
@@ -13,7 +18,11 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mockGoals } from '@/lib/mockData';
+import { Goal } from '@/types';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { goalsService } from '@/lib/firebase/goals';
+import { useEffect } from 'react';
 
 const categories = [
   { id: 'all', name: 'Todas', icon: '📋' },
@@ -23,49 +32,141 @@ const categories = [
   { id: 'Carreira', name: 'Carreira', icon: '💼' },
 ];
 
-const allGoals = [
-  ...mockGoals,
-  {
-    id: '3',
-    title: 'Correr uma maratona',
-    description: 'Completar 42km',
-    progress: 30,
-    deadline: '2024-09-15',
-    category: 'Saúde',
-    subtasks: [
-      { id: '1', title: 'Correr 5km sem parar', completed: true },
-      { id: '2', title: 'Correr 10km', completed: true },
-      { id: '3', title: 'Correr 21km (meia maratona)', completed: false },
-      { id: '4', title: 'Correr 42km', completed: false },
-    ],
-  },
-  {
-    id: '4',
-    title: 'Promoção no trabalho',
-    description: 'Alcançar cargo de Senior',
-    progress: 55,
-    deadline: '2024-12-01',
-    category: 'Carreira',
-    subtasks: [
-      { id: '1', title: 'Completar certificação', completed: true },
-      { id: '2', title: 'Liderar projeto importante', completed: true },
-      { id: '3', title: 'Mentorar 2 juniores', completed: false },
-      { id: '4', title: 'Apresentar resultados', completed: false },
-    ],
-  },
-];
-
 export function GoalsSection() {
+  const { userId } = useAuth();
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: 'Desenvolvimento',
+    deadline: '',
+    subtasks: [{ id: '1', title: '', completed: false }],
+  });
+
+  useEffect(() => {
+    loadGoals();
+  }, [userId]);
+
+  const loadGoals = async () => {
+    try {
+      const data = await goalsService.getAll(userId);
+      setGoals(data);
+    } catch (error) {
+      console.error('Erro ao carregar metas:', error);
+      toast.error('Erro ao carregar metas');
+    }
+  };
 
   const filteredGoals = selectedCategory === 'all' 
-    ? allGoals 
-    : allGoals.filter(g => g.category === selectedCategory);
+    ? goals 
+    : goals.filter(g => g.category === selectedCategory);
 
   const totalProgress = Math.round(
-    allGoals.reduce((acc, g) => acc + g.progress, 0) / allGoals.length
+    goals.length > 0 ? goals.reduce((acc, g) => acc + g.progress, 0) / goals.length : 0
   );
+
+  const handleOpenModal = () => {
+    setFormData({
+      title: '',
+      description: '',
+      category: 'Desenvolvimento',
+      deadline: '',
+      subtasks: [{ id: '1', title: '', completed: false }],
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setFormData({
+      title: '',
+      description: '',
+      category: 'Desenvolvimento',
+      deadline: '',
+      subtasks: [{ id: '1', title: '', completed: false }],
+    });
+  };
+
+  const handleAddSubtask = () => {
+    setFormData({
+      ...formData,
+      subtasks: [...formData.subtasks, { id: Date.now().toString(), title: '', completed: false }],
+    });
+  };
+
+  const handleRemoveSubtask = (id: string) => {
+    setFormData({
+      ...formData,
+      subtasks: formData.subtasks.filter(s => s.id !== id),
+    });
+  };
+
+  const handleUpdateSubtask = (id: string, title: string) => {
+    setFormData({
+      ...formData,
+      subtasks: formData.subtasks.map(s => s.id === id ? { ...s, title } : s),
+    });
+  };
+
+  const handleSaveGoal = async () => {
+    if (!formData.title.trim()) {
+      toast.error('Por favor, preencha o título da meta');
+      return;
+    }
+
+    const validSubtasks = formData.subtasks.filter(s => s.title.trim());
+    if (validSubtasks.length === 0) {
+      toast.error('Adicione pelo menos uma subtarefa');
+      return;
+    }
+
+    const completedSubtasks = validSubtasks.filter(s => s.completed).length;
+    const progress = Math.round((completedSubtasks / validSubtasks.length) * 100);
+
+    try {
+      await goalsService.create({
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        deadline: formData.deadline || undefined,
+        progress,
+        subtasks: validSubtasks,
+      }, userId);
+      await loadGoals();
+      toast.success('Meta criada com sucesso!');
+      handleCloseModal();
+    } catch (error) {
+      console.error('Erro ao criar meta:', error);
+      toast.error('Erro ao criar meta');
+    }
+  };
+
+  const handleToggleSubtask = async (goalId: string, subtaskId: string) => {
+    const goal = goals.find(g => g.id === goalId);
+    if (!goal) return;
+
+    const updatedSubtasks = goal.subtasks.map(subtask =>
+      subtask.id === subtaskId 
+        ? { ...subtask, completed: !subtask.completed }
+        : subtask
+    );
+    const completedCount = updatedSubtasks.filter(s => s.completed).length;
+    const progress = Math.round((completedCount / updatedSubtasks.length) * 100);
+
+    try {
+      await goalsService.update(goalId, {
+        subtasks: updatedSubtasks,
+        progress,
+      });
+      await loadGoals();
+    } catch (error) {
+      console.error('Erro ao atualizar subtarefa:', error);
+      toast.error('Erro ao atualizar subtarefa');
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -77,10 +178,109 @@ export function GoalsSection() {
           </h1>
           <p className="text-muted-foreground mt-1">Defina e acompanhe suas metas pessoais</p>
         </div>
-        <Button className="gradient-primary text-primary-foreground w-full sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Meta
-        </Button>
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger asChild>
+            <Button className="gradient-indigo text-indigo-foreground w-full sm:w-auto" onClick={handleOpenModal}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Meta
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Nova Meta</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Título da Meta</Label>
+                <Input
+                  id="title"
+                  placeholder="Ex: Aprender inglês fluente"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Descrição</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Descreva sua meta..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Categoria</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Desenvolvimento">Desenvolvimento</SelectItem>
+                      <SelectItem value="Financeiro">Financeiro</SelectItem>
+                      <SelectItem value="Saúde">Saúde</SelectItem>
+                      <SelectItem value="Carreira">Carreira</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="deadline">Prazo (opcional)</Label>
+                  <Input
+                    id="deadline"
+                    type="date"
+                    value={formData.deadline}
+                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Subtarefas</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddSubtask}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {formData.subtasks.map((subtask, index) => (
+                    <div key={subtask.id} className="flex items-center gap-2">
+                      <Input
+                        placeholder={`Subtarefa ${index + 1}`}
+                        value={subtask.title}
+                        onChange={(e) => handleUpdateSubtask(subtask.id, e.target.value)}
+                      />
+                      {formData.subtasks.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveSubtask(subtask.id)}
+                        >
+                          ×
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCloseModal}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveGoal}>
+                Criar Meta
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats */}
@@ -88,11 +288,11 @@ export function GoalsSection() {
         <Card className="glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-                <Target className="w-5 h-5 text-primary-foreground" />
+              <div className="w-10 h-10 rounded-xl gradient-indigo flex items-center justify-center">
+                <Target className="w-5 h-5 text-indigo-foreground" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{allGoals.length}</p>
+                <p className="text-2xl font-bold">{goals.length}</p>
                 <p className="text-xs text-muted-foreground">Metas ativas</p>
               </div>
             </div>
@@ -116,8 +316,8 @@ export function GoalsSection() {
         <Card className="glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-accent flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-accent-foreground" />
+              <div className="w-10 h-10 rounded-xl gradient-pink flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-pink-foreground" />
               </div>
               <div>
                 <p className="text-2xl font-bold">12</p>
@@ -150,7 +350,7 @@ export function GoalsSection() {
             variant={selectedCategory === cat.id ? 'default' : 'outline'}
             className={cn(
               "flex-shrink-0",
-              selectedCategory === cat.id && "gradient-primary text-primary-foreground"
+              selectedCategory === cat.id && "gradient-indigo text-indigo-foreground"
             )}
             onClick={() => setSelectedCategory(cat.id)}
           >
@@ -240,9 +440,12 @@ export function GoalsSection() {
                         {goal.subtasks.map((subtask) => (
                           <div
                             key={subtask.id}
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleSubtask(goal.id, subtask.id);
+                            }}
                             className={cn(
-                              "flex items-center gap-3 p-3 rounded-xl transition-colors",
+                              "flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer",
                               subtask.completed 
                                 ? "bg-green-500/10" 
                                 : "bg-muted/50 hover:bg-muted"

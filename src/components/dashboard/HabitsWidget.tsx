@@ -1,27 +1,74 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { mockHabits } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
 import { Check, Flame } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { habitsService } from '@/lib/firebase/habits';
+import { Habit } from '@/types';
+import { userStatsService } from '@/lib/firebase/userStats';
+import { toast } from 'sonner';
 
 export function HabitsWidget() {
+  const { userId } = useAuth();
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [completedToday, setCompletedToday] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const toggleHabit = (habitId: string) => {
+  useEffect(() => {
+    loadHabits();
+  }, [userId]);
+
+  const loadHabits = async () => {
+    try {
+      setLoading(true);
+      const data = await habitsService.getAll(userId);
+      setHabits(data);
+      
+      // Verifica quais hábitos foram completados hoje
+      const today = new Date().toISOString().split('T')[0];
+      const completed = data
+        .filter(h => h.completedDates?.includes(today))
+        .map(h => h.id);
+      setCompletedToday(completed);
+    } catch (error) {
+      console.error('Erro ao carregar hábitos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleHabit = async (habitId: string) => {
+    const isCompleted = completedToday.includes(habitId);
+    const habit = habits.find(h => h.id === habitId);
+    
     setCompletedToday(prev => 
       prev.includes(habitId) 
         ? prev.filter(id => id !== habitId)
         : [...prev, habitId]
     );
+    
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      if (!isCompleted && habit) {
+        await habitsService.markComplete(habitId, today);
+        // Adiciona XP
+        await userStatsService.addXP(userId, habit.xp);
+        await userStatsService.incrementHabitsCompleted(userId);
+        toast.success(`+${habit.xp} XP ganho!`);
+      }
+      await loadHabits();
+    } catch (error) {
+      console.error('Erro ao marcar hábito:', error);
+    }
   };
 
   const completedCount = completedToday.length;
-  const totalCount = mockHabits.length;
-  const progressPercent = (completedCount / totalCount) * 100;
+  const totalCount = habits.length;
+  const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -34,13 +81,18 @@ export function HabitsWidget() {
         {/* Progress bar */}
         <div className="w-full h-2 bg-muted rounded-full overflow-hidden mt-2">
           <div 
-            className="h-full gradient-primary transition-all duration-500 rounded-full"
+            className="h-full gradient-success transition-all duration-500 rounded-full"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {mockHabits.slice(0, 5).map((habit) => {
+        {loading ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Carregando hábitos...</p>
+        ) : habits.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhum hábito ainda. Crie seu primeiro hábito!</p>
+        ) : (
+          habits.slice(0, 5).map((habit) => {
           const isCompleted = completedToday.includes(habit.id);
           return (
             <div
@@ -79,10 +131,12 @@ export function HabitsWidget() {
               </div>
             </div>
           );
-        })}
-        <Button variant="ghost" className="w-full mt-2 text-primary">
-          Ver todos os hábitos →
-        </Button>
+        }))}
+        {habits.length > 5 && (
+          <Button variant="ghost" className="w-full mt-2 text-primary">
+            Ver todos os hábitos →
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

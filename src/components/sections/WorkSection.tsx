@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/hooks/useAuth';
+import { workService, Project, Skill, CareerGoal } from '@/lib/firebase/work';
+import { toast } from 'sonner';
 import { 
   Plus, 
   Briefcase,
@@ -16,25 +22,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const mockProjects = [
-  { id: '1', name: 'Redesign do App', progress: 75, deadline: '2024-02-15', status: 'Em andamento' },
-  { id: '2', name: 'API de Pagamentos', progress: 45, deadline: '2024-03-01', status: 'Em andamento' },
-  { id: '3', name: 'Documentação', progress: 90, deadline: '2024-02-01', status: 'Finalizando' },
-];
-
-const mockSkills = [
-  { name: 'Liderança', level: 70, target: 85 },
-  { name: 'Comunicação', level: 80, target: 90 },
-  { name: 'Gestão de Tempo', level: 55, target: 75 },
-  { name: 'Resolução de Problemas', level: 85, target: 90 },
-];
-
-const mockCareerGoals = [
-  { id: '1', title: 'Promoção para Senior', completed: false, deadline: '2024-06' },
-  { id: '2', title: 'Certificação AWS', completed: true, deadline: '2024-01' },
-  { id: '3', title: 'Liderar equipe de 5+', completed: false, deadline: '2024-09' },
-];
-
 const teamMembers = [
   { name: 'Ana', role: 'Designer', relationship: 'Ótimo', lastInteraction: 'Hoje' },
   { name: 'Carlos', role: 'Dev Backend', relationship: 'Bom', lastInteraction: '2 dias' },
@@ -43,8 +30,70 @@ const teamMembers = [
 ];
 
 export function WorkSection() {
+  const { userId } = useAuth();
   const [workMood, setWorkMood] = useState(4);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [careerGoals, setCareerGoals] = useState<CareerGoal[]>([]);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [projectFormData, setProjectFormData] = useState({
+    name: '',
+    progress: 0,
+    deadline: '',
+    status: 'Em andamento',
+  });
   const moods = ['😫', '😕', '😐', '🙂', '😊'];
+
+  useEffect(() => {
+    loadData();
+  }, [userId]);
+
+  const loadData = async () => {
+    try {
+      const [projectsData, skillsData, goalsData] = await Promise.all([
+        workService.getAllProjects(userId),
+        workService.getAllSkills(userId),
+        workService.getAllCareerGoals(userId),
+      ]);
+      setProjects(projectsData);
+      setSkills(skillsData);
+      setCareerGoals(goalsData);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      toast.error('Erro ao carregar dados profissionais');
+    }
+  };
+
+  const handleSaveProject = async () => {
+    if (!projectFormData.name.trim()) {
+      toast.error('Preencha o nome do projeto');
+      return;
+    }
+
+    try {
+      await workService.createProject(projectFormData, userId);
+      await loadData();
+      toast.success('Projeto criado!');
+      setIsProjectModalOpen(false);
+      setProjectFormData({ name: '', progress: 0, deadline: '', status: 'Em andamento' });
+    } catch (error) {
+      console.error('Erro ao criar projeto:', error);
+      toast.error('Erro ao criar projeto');
+    }
+  };
+
+  const handleToggleCareerGoal = async (goalId: string) => {
+    const goal = careerGoals.find(g => g.id === goalId);
+    if (!goal) return;
+
+    try {
+      await workService.updateCareerGoal(goalId, { completed: !goal.completed });
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao atualizar meta:', error);
+      toast.error('Erro ao atualizar meta');
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -56,10 +105,60 @@ export function WorkSection() {
           </h1>
           <p className="text-muted-foreground mt-1">Acompanhe sua carreira e projetos</p>
         </div>
-        <Button className="gradient-primary text-primary-foreground w-full sm:w-auto">
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Projeto
-        </Button>
+        <Dialog open={isProjectModalOpen} onOpenChange={setIsProjectModalOpen}>
+          <DialogTrigger asChild>
+            <Button className="gradient-blue text-blue-foreground w-full sm:w-auto" onClick={() => setIsProjectModalOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Projeto
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Novo Projeto</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="projectName">Nome do Projeto</Label>
+                <Input
+                  id="projectName"
+                  placeholder="Ex: Redesign do App"
+                  value={projectFormData.name}
+                  onChange={(e) => setProjectFormData({ ...projectFormData, name: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="progress">Progresso (%)</Label>
+                  <Input
+                    id="progress"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={projectFormData.progress}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, progress: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="deadline">Prazo</Label>
+                  <Input
+                    id="deadline"
+                    type="date"
+                    value={projectFormData.deadline}
+                    onChange={(e) => setProjectFormData({ ...projectFormData, deadline: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsProjectModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveProject}>
+                Criar Projeto
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Quick Stats */}
@@ -67,11 +166,11 @@ export function WorkSection() {
         <Card className="glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-                <Briefcase className="w-5 h-5 text-primary-foreground" />
+              <div className="w-10 h-10 rounded-xl gradient-blue flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-blue-foreground" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{mockProjects.length}</p>
+                <p className="text-2xl font-bold">{projects.length}</p>
                 <p className="text-xs text-muted-foreground">Projetos ativos</p>
               </div>
             </div>
@@ -95,8 +194,8 @@ export function WorkSection() {
         <Card className="glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-accent flex items-center justify-center">
-                <Users className="w-5 h-5 text-accent-foreground" />
+              <div className="w-10 h-10 rounded-xl gradient-cyan flex items-center justify-center">
+                <Users className="w-5 h-5 text-cyan-foreground" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{teamMembers.length}</p>
@@ -157,7 +256,7 @@ export function WorkSection() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {mockProjects.map((project) => (
+          {projects.map((project) => (
             <div key={project.id} className="p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-semibold">{project.name}</h4>
@@ -194,7 +293,7 @@ export function WorkSection() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {mockSkills.map((skill) => (
+            {skills.map((skill) => (
               <div key={skill.name}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium">{skill.name}</span>
@@ -208,7 +307,7 @@ export function WorkSection() {
                     style={{ width: `${skill.target}%` }}
                   />
                   <div 
-                    className="absolute h-full gradient-primary rounded-full transition-all"
+                    className="absolute h-full gradient-blue rounded-full transition-all"
                     style={{ width: `${skill.level}%` }}
                   />
                 </div>
@@ -226,11 +325,12 @@ export function WorkSection() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {mockCareerGoals.map((goal) => (
+            {careerGoals.map((goal) => (
               <div 
                 key={goal.id} 
+                onClick={() => handleToggleCareerGoal(goal.id)}
                 className={cn(
-                  "flex items-center gap-3 p-3 rounded-xl",
+                  "flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-muted transition-colors",
                   goal.completed ? "bg-green-500/10" : "bg-muted/50"
                 )}
               >
@@ -264,7 +364,7 @@ export function WorkSection() {
             {teamMembers.map((member, index) => (
               <div key={index} className="p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold">
+                  <div className="w-10 h-10 rounded-full gradient-pink flex items-center justify-center text-pink-foreground font-semibold">
                     {member.name[0]}
                   </div>
                   <div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { moodEmojis } from '@/lib/mockData';
@@ -6,9 +6,13 @@ import { cn } from '@/lib/utils';
 import { 
   Droplet, Moon, Zap, DollarSign, Dumbbell, 
   Brain, Heart, Coffee, BookOpen, Save,
-  ChevronRight, ChevronLeft
+  ChevronRight, ChevronLeft, CheckCircle2, Edit
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { checkinService } from '@/lib/firebase/checkin';
+import { userStatsService, checkAndGrantBadges } from '@/lib/firebase/userStats';
+import { DailyCheckIn } from '@/types';
 
 const moodReasons = [
   { id: 'work', label: 'Trabalho', icon: '💼' },
@@ -20,23 +24,141 @@ const moodReasons = [
 ];
 
 export function CheckinSection() {
+  const { userId } = useAuth();
   const [step, setStep] = useState(1);
   const [mood, setMood] = useState<number | null>(null);
   const [moodReason, setMoodReason] = useState<string | null>(null);
   const [energy, setEnergy] = useState(5);
   const [productivity, setProductivity] = useState(5);
-  const [water, setWater] = useState(4);
+  const [water, setWater] = useState(1.5); // Em litros
   const [sleep, setSleep] = useState(7);
   const [workout, setWorkout] = useState(false);
   const [expenses, setExpenses] = useState('');
   const [reflection, setReflection] = useState('');
+  const [existingCheckin, setExistingCheckin] = useState<DailyCheckIn | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
 
   const totalSteps = 4;
 
-  const handleSave = () => {
-    toast.success('Check-in salvo com sucesso!', {
-      description: 'Seu progresso foi registrado. Continue assim!'
-    });
+  // Verifica se é o dia atual
+  const isToday = (date: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    return date === today;
+  };
+
+  // Carrega check-in do dia se existir
+  useEffect(() => {
+    if (userId) {
+      loadTodayCheckin();
+    }
+  }, [userId]);
+
+  const loadTodayCheckin = async () => {
+    if (!userId) return;
+    
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const checkin = await checkinService.getByDate(userId, today);
+      
+      if (checkin) {
+        setExistingCheckin(checkin);
+        // Não preenche os campos automaticamente - só quando o usuário clicar em editar
+      } else {
+        // Se não há check-in, reseta o estado de edição e os campos
+        setExistingCheckin(null);
+        setIsEditing(false);
+        // Reseta os campos para valores padrão
+        setMood(null);
+        setMoodReason(null);
+        setEnergy(5);
+        setProductivity(5);
+        setWater(1.5);
+        setSleep(7);
+        setWorkout(false);
+        setExpenses('');
+        setReflection('');
+        setStep(1);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar check-in:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+      
+      // Verifica se já existe check-in hoje (usa o estado existente ou busca novamente)
+      const currentCheckin = existingCheckin || await checkinService.getByDate(userId, todayStr);
+      
+      const checkinData = {
+        date: todayStr,
+        mood: mood !== null ? mood + 1 : 4,
+        moodEmoji: mood !== null ? moodEmojis[mood] : '😊',
+        energy,
+        productivity,
+        expenses: parseFloat(expenses) || 0,
+        workout,
+        waterLiters: water,
+        waterGlasses: Math.round(water / 0.25), // Mantém compatibilidade
+        sleepHours: sleep,
+        reflection,
+        moodReason: moodReason || undefined,
+      };
+      
+      if (currentCheckin) {
+        // Sempre atualiza se já existe
+        await checkinService.update(currentCheckin.id, checkinData);
+        toast.success('Check-in atualizado com sucesso!', {
+          description: 'Seu progresso foi atualizado.'
+        });
+        // Recarrega para atualizar o estado e sai do modo de edição
+        setIsEditing(false);
+        await loadTodayCheckin();
+      } else {
+        // Só cria se não existe
+        await checkinService.create(checkinData, userId);
+        // Adiciona XP por fazer check-in completo (só na primeira vez)
+        await userStatsService.addXP(userId, 50);
+        await userStatsService.incrementCheckInsCompleted(userId);
+        
+        // Verifica e concede badges
+        const stats = await userStatsService.getOrCreate(userId);
+        const newBadges = await checkAndGrantBadges(userId, {
+          habitsCompleted: stats.totalHabitsCompleted || 0,
+          currentStreak: stats.currentStreak || 0,
+          workoutsCompleted: stats.workoutsCompleted || 0,
+          checkInsCompleted: (stats.checkInsCompleted || 0) + 1,
+        });
+        
+        for (const badge of newBadges) {
+          await userStatsService.addBadge(userId, badge);
+          toast.success(`🏆 Nova conquista: ${badge.name}!`, {
+            description: badge.description,
+            duration: 5000,
+          });
+        }
+        
+        toast.success('Check-in salvo com sucesso!', {
+          description: 'Seu progresso foi registrado. Continue assim!'
+        });
+        // Recarrega para mostrar que agora existe e sai do modo de edição
+        setIsEditing(false);
+        await loadTodayCheckin();
+      }
+      
+      // Dispara eventos para atualizar
+      window.dispatchEvent(new Event('checkin-saved'));
+      window.dispatchEvent(new Event('stats-updated'));
+    } catch (error) {
+      console.error('Erro ao salvar check-in:', error);
+      toast.error('Erro ao salvar check-in');
+    }
   };
 
   const renderStep = () => {
@@ -166,22 +288,22 @@ export function CheckinSection() {
                   </div>
                   <div>
                     <p className="font-semibold">Água</p>
-                    <p className="text-xs text-muted-foreground">Copos de água</p>
+                    <p className="text-xs text-muted-foreground">Litros de água</p>
                   </div>
                 </div>
                 <div className="flex items-center justify-center gap-4">
                   <Button 
                     variant="outline" 
                     size="icon"
-                    onClick={() => setWater(Math.max(0, water - 1))}
+                    onClick={() => setWater(Math.max(0, water - 0.5))}
                   >
                     -
                   </Button>
-                  <span className="text-4xl font-bold w-16 text-center">{water}</span>
+                  <span className="text-4xl font-bold w-20 text-center">{water.toFixed(1)}</span>
                   <Button 
                     variant="outline" 
                     size="icon"
-                    onClick={() => setWater(water + 1)}
+                    onClick={() => setWater(water + 0.5)}
                   >
                     +
                   </Button>
@@ -203,7 +325,7 @@ export function CheckinSection() {
                   <Button 
                     variant="outline" 
                     size="icon"
-                    onClick={() => setSleep(Math.max(0, sleep - 0.5))}
+                    onClick={() => setSleep(Math.max(0, sleep - 1))}
                   >
                     -
                   </Button>
@@ -211,7 +333,7 @@ export function CheckinSection() {
                   <Button 
                     variant="outline" 
                     size="icon"
-                    onClick={() => setSleep(sleep + 0.5)}
+                    onClick={() => setSleep(sleep + 1)}
                   >
                     +
                   </Button>
@@ -310,8 +432,8 @@ export function CheckinSection() {
                   <p className="text-sm opacity-80 mt-1">Energia</p>
                 </div>
                 <div>
-                  <span className="text-2xl font-bold">{water}</span>
-                  <p className="text-sm opacity-80 mt-1">Copos água</p>
+                  <span className="text-2xl font-bold">{water.toFixed(1)}</span>
+                  <p className="text-sm opacity-80 mt-1">Litros água</p>
                 </div>
                 <div>
                   <span className="text-2xl font-bold">{sleep}h</span>
@@ -324,12 +446,112 @@ export function CheckinSection() {
     }
   };
 
+  // Se há check-in do dia e não está editando, mostra o card de confirmação
+  if (existingCheckin && isToday(existingCheckin.date) && !isEditing) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Check-in Diário</h1>
+            <p className="text-muted-foreground mt-1">
+              Registre seu dia e acompanhe seu progresso
+            </p>
+          </div>
+        </div>
+
+        {/* Card de Check-in Concluído */}
+        <Card className="p-6 gradient-success border-success/20">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="w-6 h-6 text-success" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xl font-bold text-success-foreground">
+                  Check-in do dia concluído! ✅
+                </h3>
+                <span className="text-xs text-success-foreground/80 bg-success/20 px-2 py-1 rounded-full">
+                  {new Date(existingCheckin.date).toLocaleDateString('pt-BR', { 
+                    weekday: 'long', 
+                    day: 'numeric', 
+                    month: 'long' 
+                  })}
+                </span>
+              </div>
+              <p className="text-success-foreground/80 mb-4">
+                Você já registrou seu check-in de hoje. Deseja editar alguma informação?
+              </p>
+              
+              {/* Resumo do Check-in */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <div className="bg-success/10 rounded-xl p-3 text-center">
+                  <span className="text-2xl block mb-1">{existingCheckin.moodEmoji}</span>
+                  <p className="text-xs text-success-foreground/80">Humor</p>
+                </div>
+                <div className="bg-success/10 rounded-xl p-3 text-center">
+                  <span className="text-lg font-bold block mb-1">{existingCheckin.energy}/10</span>
+                  <p className="text-xs text-success-foreground/80">Energia</p>
+                </div>
+                <div className="bg-success/10 rounded-xl p-3 text-center">
+                  <span className="text-lg font-bold block mb-1">
+                    {existingCheckin.waterLiters?.toFixed(1) || (existingCheckin.waterGlasses ? (existingCheckin.waterGlasses * 0.25).toFixed(1) : '0.0')}L
+                  </span>
+                  <p className="text-xs text-success-foreground/80">Água</p>
+                </div>
+                <div className="bg-success/10 rounded-xl p-3 text-center">
+                  <span className="text-lg font-bold block mb-1">{existingCheckin.sleepHours}h</span>
+                  <p className="text-xs text-success-foreground/80">Sono</p>
+                </div>
+              </div>
+
+              <Button
+                onClick={() => {
+                  setIsEditing(true);
+                  setStep(1);
+                  // Preenche os campos com os dados existentes
+                  setMood(existingCheckin.mood - 1);
+                  setMoodReason(existingCheckin.moodReason || null);
+                  setEnergy(existingCheckin.energy);
+                  setProductivity(existingCheckin.productivity);
+                  if (existingCheckin.waterLiters !== undefined) {
+                    setWater(existingCheckin.waterLiters);
+                  } else if (existingCheckin.waterGlasses) {
+                    setWater(existingCheckin.waterGlasses * 0.25);
+                  }
+                  setSleep(existingCheckin.sleepHours);
+                  setWorkout(existingCheckin.workout);
+                  setExpenses(existingCheckin.expenses > 0 ? existingCheckin.expenses.toString() : '');
+                  setReflection(existingCheckin.reflection || '');
+                }}
+                variant="outline"
+                className="w-full bg-success-foreground/10 hover:bg-success-foreground/20 border-success-foreground/20 text-success-foreground"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Editar Check-in
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Check-in Diário</h1>
-        <p className="text-muted-foreground mt-1">Registre seu dia e acompanhe seu progresso</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Check-in Diário</h1>
+          <p className="text-muted-foreground mt-1">
+            {existingCheckin && isEditing ? 'Editando seu check-in de hoje' : 'Registre seu dia e acompanhe seu progresso'}
+          </p>
+        </div>
+        {existingCheckin && isEditing && (
+          <span className="text-xs text-muted-foreground bg-primary/10 text-primary px-3 py-1.5 rounded-full">
+            Editando
+          </span>
+        )}
       </div>
 
       {/* Progress Indicator */}
@@ -339,7 +561,7 @@ export function CheckinSection() {
             key={i}
             className={cn(
               "flex-1 h-2 rounded-full transition-all",
-              i + 1 <= step ? "gradient-primary" : "bg-muted"
+              i + 1 <= step ? "gradient-cyan" : "bg-muted"
             )}
           />
         ))}
@@ -354,11 +576,20 @@ export function CheckinSection() {
       <div className="flex items-center justify-between">
         <Button
           variant="outline"
-          onClick={() => setStep(s => Math.max(1, s - 1))}
-          disabled={step === 1}
+          onClick={() => {
+            if (step === 1 && existingCheckin && isEditing) {
+              setIsEditing(false);
+              setStep(1);
+              // Recarrega o check-in para mostrar o card de confirmação
+              loadTodayCheckin();
+            } else {
+              setStep(s => Math.max(1, s - 1));
+            }
+          }}
+          disabled={step === 1 && (!existingCheckin || !isEditing)}
         >
           <ChevronLeft className="w-4 h-4 mr-2" />
-          Anterior
+          {step === 1 && existingCheckin && isEditing ? 'Cancelar' : 'Anterior'}
         </Button>
         
         {step < totalSteps ? (
@@ -367,9 +598,13 @@ export function CheckinSection() {
             <ChevronRight className="w-4 h-4 ml-2" />
           </Button>
         ) : (
-          <Button variant="success" onClick={handleSave}>
+          <Button 
+            variant="success" 
+            onClick={handleSave}
+            disabled={loading}
+          >
             <Save className="w-4 h-4 mr-2" />
-            Salvar Check-in
+            {existingCheckin ? 'Atualizar Check-in' : 'Salvar Check-in'}
           </Button>
         )}
       </div>

@@ -1,22 +1,56 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { mockFinancialEntries, mockWeeklyData, expenseCategories } from '@/lib/mockData';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { expenseCategories } from '@/lib/mockData';
+import { FinancialEntry } from '@/types';
 import { cn } from '@/lib/utils';
 import { 
   ArrowDownRight, ArrowUpRight, Plus, TrendingUp, TrendingDown,
   PieChart, Target, AlertTriangle, Lightbulb
 } from 'lucide-react';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis } from 'recharts';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { financeService } from '@/lib/firebase/finance';
+import { useEffect } from 'react';
 
 export function FinanceSection() {
+  const { userId } = useAuth();
+  const [entries, setEntries] = useState<FinancialEntry[]>([]);
   const [period, setPeriod] = useState<'week' | 'month'>('month');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    type: 'expense' as 'income' | 'expense',
+    amount: '',
+    category: 'Alimentação',
+    description: '',
+    date: new Date().toISOString().split('T')[0],
+  });
 
-  const totalIncome = mockFinancialEntries
+  useEffect(() => {
+    loadEntries();
+  }, [userId]);
+
+  const loadEntries = async () => {
+    try {
+      const data = await financeService.getAll(userId);
+      setEntries(data);
+    } catch (error) {
+      console.error('Erro ao carregar transações:', error);
+      toast.error('Erro ao carregar transações');
+    }
+  };
+
+  const totalIncome = entries
     .filter(e => e.type === 'income')
     .reduce((sum, e) => sum + e.amount, 0);
   
-  const totalExpenses = mockFinancialEntries
+  const totalExpenses = entries
     .filter(e => e.type === 'expense')
     .reduce((sum, e) => sum + e.amount, 0);
 
@@ -24,22 +58,95 @@ export function FinanceSection() {
   const savingsRate = ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(0);
 
   // Expenses by category
-  const expensesByCategory = mockFinancialEntries
+  const expensesByCategory = entries
     .filter(e => e.type === 'expense')
     .reduce((acc, e) => {
       acc[e.category] = (acc[e.category] || 0) + e.amount;
       return acc;
     }, {} as Record<string, number>);
 
+  const handleOpenModal = () => {
+    setFormData({
+      type: 'expense',
+      amount: '',
+      category: 'Alimentação',
+      description: '',
+      date: new Date().toISOString().split('T')[0],
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setFormData({
+      type: 'expense',
+      amount: '',
+      category: 'Alimentação',
+      description: '',
+      date: new Date().toISOString().split('T')[0],
+    });
+  };
+
+  const handleSaveEntry = async () => {
+    if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      toast.error('Por favor, insira um valor válido');
+      return;
+    }
+
+    if (!formData.description.trim()) {
+      toast.error('Por favor, preencha a descrição');
+      return;
+    }
+
+    try {
+      await financeService.create({
+        type: formData.type,
+        amount: parseFloat(formData.amount),
+        category: formData.category,
+        description: formData.description,
+        date: formData.date,
+      }, userId);
+      await loadEntries();
+      toast.success(`${formData.type === 'income' ? 'Receita' : 'Despesa'} adicionada com sucesso!`);
+      handleCloseModal();
+    } catch (error) {
+      console.error('Erro ao salvar transação:', error);
+      toast.error('Erro ao salvar transação');
+    }
+  };
+
+  const incomeCategories = ['Salário', 'Freelance', 'Investimentos', 'Outros'];
+
   const pieData = Object.entries(expensesByCategory).map(([name, value]) => {
     const category = expenseCategories.find(c => c.name === name);
     return { name, value, color: category?.color || 'hsl(var(--muted))' };
   });
 
-  const weeklyExpenses = mockWeeklyData.days.map((day, index) => ({
-    day,
-    value: mockWeeklyData.expenses[index],
-  }));
+  // Gera dados reais da semana (últimos 7 dias)
+  const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const weeklyExpenses = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    const dateStr = date.toISOString().split('T')[0];
+    
+    // Busca todas as despesas deste dia
+    const dayEntries = entries.filter(e => {
+      const entryDate = String(e.date).split('T')[0];
+      return entryDate === dateStr && e.type === 'expense';
+    });
+    
+    const dayExpenses = dayEntries.reduce((sum, e) => sum + e.amount, 0);
+    const dayName = days[date.getDay()];
+    
+    return { 
+      day: dayName, 
+      value: dayExpenses,
+      date: dateStr 
+    };
+  });
 
   const insights = [
     { type: 'warning', text: 'Você gastou 22% mais em Alimentação esta semana' },
@@ -62,15 +169,107 @@ export function FinanceSection() {
           <Button variant="outline" size="sm" onClick={() => setPeriod('month')} className={period === 'month' ? 'bg-muted' : ''}>
             Mês
           </Button>
-          <Button size="sm">
-            <Plus className="w-4 h-4 mr-2" />
-            Adicionar
-          </Button>
+          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" onClick={handleOpenModal}>
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Nova Transação</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="type">Tipo</Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value: 'income' | 'expense') => 
+                      setFormData({ ...formData, type: value, category: value === 'income' ? 'Salário' : 'Alimentação' })
+                    }
+                  >
+                    <SelectTrigger id="type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="income">Receita</SelectItem>
+                      <SelectItem value="expense">Despesa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Valor (R$)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0,00"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="category">Categoria</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.type === 'income' ? (
+                        incomeCategories.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))
+                      ) : (
+                        expenseCategories.map(cat => (
+                          <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descrição</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Descreva a transação..."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="date">Data</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={handleCloseModal}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleSaveEntry}>
+                  Adicionar Transação
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
       {/* Main Balance Card */}
-      <Card className="gradient-primary text-primary-foreground p-8">
+      <Card className="gradient-cyan text-cyan-foreground p-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <p className="text-sm opacity-80">Saldo atual</p>
@@ -233,7 +432,7 @@ export function FinanceSection() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {mockFinancialEntries.map((transaction) => {
+            {entries.map((transaction) => {
               const category = expenseCategories.find(c => c.name === transaction.category);
               return (
                 <div key={transaction.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-muted transition-colors">

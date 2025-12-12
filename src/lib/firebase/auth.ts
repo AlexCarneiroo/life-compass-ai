@@ -7,9 +7,15 @@ import {
   User,
   sendPasswordResetEmail,
   updateProfile,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  reload,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
+import { logger } from '@/lib/utils/logger';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -21,7 +27,7 @@ export const authService = {
       toast.success('Login realizado com sucesso!');
       return userCredential.user;
     } catch (error: any) {
-      console.error('Erro ao fazer login:', error);
+      logger.error('Erro ao fazer login:', error);
       let errorMessage = 'Erro ao fazer login';
       
       switch (error.code) {
@@ -64,7 +70,7 @@ export const authService = {
       toast.success('Conta criada com sucesso!');
       return userCredential.user;
     } catch (error: any) {
-      console.error('Erro ao criar conta:', error);
+      logger.error('Erro ao criar conta:', error);
       let errorMessage = 'Erro ao criar conta';
       
       switch (error.code) {
@@ -93,7 +99,7 @@ export const authService = {
       toast.success('Login com Google realizado com sucesso!');
       return result.user;
     } catch (error: any) {
-      console.error('Erro ao fazer login com Google:', error);
+      logger.error('Erro ao fazer login com Google:', error);
       let errorMessage = 'Erro ao fazer login com Google';
       
       if (error.code === 'auth/popup-closed-by-user') {
@@ -115,7 +121,7 @@ export const authService = {
       await signOut(auth);
       toast.success('Logout realizado com sucesso!');
     } catch (error: any) {
-      console.error('Erro ao fazer logout:', error);
+      logger.error('Erro ao fazer logout:', error);
       toast.error('Erro ao fazer logout');
       throw error;
     }
@@ -127,7 +133,7 @@ export const authService = {
       await sendPasswordResetEmail(auth, email);
       toast.success('Email de recuperação enviado!');
     } catch (error: any) {
-      console.error('Erro ao enviar email de recuperação:', error);
+      logger.error('Erro ao enviar email de recuperação:', error);
       let errorMessage = 'Erro ao enviar email';
       
       switch (error.code) {
@@ -139,6 +145,127 @@ export const authService = {
           break;
         default:
           errorMessage = error.message || 'Erro ao enviar email';
+      }
+      
+      toast.error(errorMessage);
+      throw error;
+    }
+  },
+
+  // Atualizar perfil
+  async updateProfile(updates: { displayName?: string; photoURL?: string }): Promise<void> {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      await updateProfile(user, {
+        displayName: updates.displayName,
+        photoURL: updates.photoURL,
+      });
+      
+      // Força recarregar o usuário para atualizar o estado
+      await reload(user);
+    } catch (error: any) {
+      logger.error('Erro ao atualizar perfil:', error);
+      let errorMessage = 'Erro ao atualizar perfil';
+      
+      switch (error.code) {
+        case 'auth/requires-recent-login':
+          errorMessage = 'Por favor, faça login novamente para atualizar seu perfil';
+          break;
+        default:
+          errorMessage = error.message || 'Erro ao atualizar perfil';
+      }
+      
+      toast.error(errorMessage);
+      throw error;
+    }
+  },
+
+  // Upload de foto de perfil
+  async uploadProfilePhoto(file: File): Promise<string> {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Criar referência no Storage
+      const fileRef = ref(storage, `profile-photos/${user.uid}/${Date.now()}_${file.name}`);
+      
+      // Fazer upload
+      await uploadBytes(fileRef, file);
+      
+      // Obter URL de download
+      const downloadURL = await getDownloadURL(fileRef);
+      
+      // Atualizar perfil com a nova foto
+      await updateProfile(user, {
+        photoURL: downloadURL,
+      });
+      
+      // Força recarregar o usuário para atualizar o estado
+      await reload(user);
+      
+      return downloadURL;
+    } catch (error: any) {
+      logger.error('Erro ao fazer upload da foto:', error);
+      let errorMessage = 'Erro ao fazer upload da foto';
+      
+      if (error.code === 'storage/unauthorized') {
+        errorMessage = 'Sem permissão para fazer upload. Configure as regras do Firebase Storage.';
+      } else if (error.code === 'storage/canceled') {
+        errorMessage = 'Upload cancelado';
+      } else if (error.code === 'storage/unknown') {
+        errorMessage = 'Erro desconhecido ao fazer upload';
+      } else if (error.message?.includes('CORS') || error.message?.includes('cors')) {
+        errorMessage = 'Erro de CORS. Configure as regras do Firebase Storage no console. Veja FIREBASE_STORAGE_RULES.md';
+      } else if (error.message?.includes('network') || error.message?.includes('ERR_FAILED')) {
+        errorMessage = 'Erro de rede. Verifique as regras do Firebase Storage e sua conexão.';
+      } else {
+        errorMessage = error.message || 'Erro ao fazer upload da foto';
+      }
+      
+      toast.error(errorMessage);
+      throw error;
+    }
+  },
+
+  // Atualizar senha
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    try {
+      const user = auth.currentUser;
+      if (!user || !user.email) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Reautenticar o usuário
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      
+      // Atualizar senha
+      await updatePassword(user, newPassword);
+    } catch (error: any) {
+      logger.error('Erro ao alterar senha:', error);
+      let errorMessage = 'Erro ao alterar senha';
+      
+      switch (error.code) {
+        case 'auth/wrong-password':
+          errorMessage = 'Senha atual incorreta';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'A nova senha é muito fraca. Use pelo menos 6 caracteres';
+          break;
+        case 'auth/requires-recent-login':
+          errorMessage = 'Por favor, faça login novamente para alterar sua senha';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Muitas tentativas. Tente novamente mais tarde';
+          break;
+        default:
+          errorMessage = error.message || 'Erro ao alterar senha';
       }
       
       toast.error(errorMessage);

@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { habitsService } from '@/lib/firebase/habits';
 import { Habit } from '@/types';
 import { userStatsService } from '@/lib/firebase/userStats';
+import { disciplineChallengeService } from '@/lib/firebase/disciplineChallenge';
 import { toast } from 'sonner';
 
 export function HabitsWidget() {
@@ -52,6 +53,33 @@ export function HabitsWidget() {
       const today = new Date().toISOString().split('T')[0];
       if (!isCompleted && habit) {
         await habitsService.markComplete(habitId, today);
+        
+        // Marca também no desafio se houver um desafio ativo
+        try {
+          const activeChallenge = await disciplineChallengeService.getActiveForHabit(userId, habitId);
+          if (activeChallenge && activeChallenge.status === 'active') {
+            // Normaliza as datas para comparação
+            const challengeStart = activeChallenge.startDate.split('T')[0];
+            const challengeEnd = activeChallenge.endDate.split('T')[0];
+            
+            // Verifica se a data está dentro do período do desafio
+            if (today >= challengeStart && today <= challengeEnd) {
+              await disciplineChallengeService.markDayComplete(activeChallenge.id, today);
+              // Verifica se completou o desafio
+              const updatedChallenge = await disciplineChallengeService.getActiveForHabit(userId, habitId);
+              if (updatedChallenge?.status === 'completed') {
+                toast.success('🏆 Desafio Completo!', {
+                  description: `Parabéns! Você completou ${activeChallenge.duration} dias de "${habit.name}"!`,
+                  duration: 8000,
+                });
+              }
+            }
+          }
+        } catch (error) {
+          // Ignora erros do desafio para não bloquear a marcação do hábito
+          console.error('Erro ao marcar dia no desafio:', error);
+        }
+        
         // Adiciona XP
         await userStatsService.addXP(userId, habit.xp);
         await userStatsService.incrementHabitsCompleted(userId);

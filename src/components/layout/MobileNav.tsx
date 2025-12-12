@@ -13,12 +13,35 @@ import {
   Clock,
   BookOpen,
   Brain,
-  BarChart3
+  BarChart3,
+  User,
+  Settings,
+  LogOut,
+  Trophy,
+  Bell,
+  X,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  Wrench
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { isAvatarURL, getAvatarIdFromURL, getAvatarById } from '@/lib/utils/avatars';
 
 interface MobileNavProps {
   activeSection: string;
@@ -26,19 +49,18 @@ interface MobileNavProps {
 }
 
 const menuItems = [
-  { id: 'dashboard', label: 'Visão da Vida', icon: LayoutDashboard },
-  { id: 'checkin', label: 'Check-in Diário', icon: CheckSquare },
-  { id: 'habits', label: 'Hábitos', icon: Target },
-  // { id: 'mood', label: 'Humor & Emoções', icon: Heart }, // Arquivado
-  { id: 'finance', label: 'Financeiro', icon: Wallet },
-  { id: 'goals', label: 'Metas & Objetivos', icon: Sparkles },
-  { id: 'health', label: 'Saúde', icon: Dumbbell },
-  { id: 'routines', label: 'Rotinas', icon: Clock },
-  { id: 'journal', label: 'Diário', icon: BookOpen },
-  // { id: 'work', label: 'Vida Profissional', icon: Briefcase }, // Arquivado
-  { id: 'ai', label: 'IA Coach', icon: Brain },
-  { id: 'reports', label: 'Relatórios', icon: BarChart3 },
-];
+  { id: 'dashboard', label: 'Visão da Vida', icon: LayoutDashboard, color: 'text-indigo-500', activeBg: 'bg-indigo-500' },
+  { id: 'checkin', label: 'Check-in Diário', icon: CheckSquare, color: 'text-emerald-500', activeBg: 'bg-emerald-500' },
+  { id: 'habits', label: 'Hábitos', icon: Target, color: 'text-purple-500', activeBg: 'bg-purple-500' },
+  { id: 'finance', label: 'Financeiro', icon: Wallet, color: 'text-blue-500', activeBg: 'bg-blue-500' },
+  { id: 'goals', label: 'Metas & Objetivos', icon: Sparkles, color: 'text-yellow-500', activeBg: 'bg-yellow-500' },
+  { id: 'health', label: 'Saúde', icon: Dumbbell, color: 'text-orange-500', activeBg: 'bg-orange-500' },
+  { id: 'routines', label: 'Rotinas', icon: Clock, color: 'text-cyan-500', activeBg: 'bg-cyan-500' },
+  { id: 'journal', label: 'Diário', icon: BookOpen, color: 'text-rose-500', activeBg: 'bg-rose-500' },
+  { id: 'ai', label: 'IA Coach', icon: Brain, color: 'text-violet-500', activeBg: 'bg-violet-500' },
+  { id: 'reports', label: 'Relatórios', icon: BarChart3, color: 'text-teal-500', activeBg: 'bg-teal-500' },
+/*   { id: 'tools', label: 'Ferramentas', icon: Wrench, color: 'text-amber-500', activeBg: 'bg-amber-500' },
+ */];
 
 const quickNavItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Visão Geral', color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', activeBg: 'bg-indigo-500', glow: 'shadow-indigo-500/30' },
@@ -49,11 +71,24 @@ const quickNavItems = [
 
 export function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
   const [open, setOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
+  const navigate = useNavigate();
 
   const handleSectionChange = (section: string) => {
     onSectionChange(section);
     setOpen(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
   };
 
   return (
@@ -79,6 +114,128 @@ export function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
         </motion.div>
         
         <div className="flex items-center gap-2">
+          {/* Notifications */}
+          <DropdownMenu open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+            <DropdownMenuTrigger asChild>
+              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                <Button variant="ghost" size="icon" className="rounded-xl relative">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full" />
+                  )}
+                </Button>
+              </motion.div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[360px] p-0 glass-card border-border/50 z-[60]">
+              <div className="p-4 border-b border-border/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold">Notificações</h3>
+                    {unreadCount > 0 && (
+                      <span className="bg-accent text-accent-foreground text-xs px-2 py-0.5 rounded-full">
+                        {unreadCount} não lidas
+                      </span>
+                    )}
+                  </div>
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        await markAllAsRead();
+                      }}
+                      className="h-7 text-xs"
+                    >
+                      Marcar todas como lidas
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <ScrollArea className="h-[400px]">
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <Bell className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                    <p className="text-muted-foreground text-sm">Nenhuma notificação</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/50">
+                    {notifications.map((notification) => {
+                      const Icon = notification.type === 'negative' 
+                        ? AlertCircle 
+                        : notification.type === 'positive'
+                        ? CheckCircle
+                        : Info;
+                      
+                      const iconColor = notification.type === 'negative'
+                        ? 'text-red-500'
+                        : notification.type === 'positive'
+                        ? 'text-green-500'
+                        : 'text-blue-500';
+
+                      return (
+                        <div
+                          key={notification.id}
+                          className={cn(
+                            "p-4 hover:bg-muted/50 transition-colors cursor-pointer group",
+                            !notification.read && "bg-primary/5"
+                          )}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!notification.read) {
+                              await markAsRead(notification.id);
+                            }
+                          }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={cn("mt-0.5", iconColor)}>
+                              <Icon className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className={cn(
+                                  "font-semibold text-sm",
+                                  !notification.read && "font-bold"
+                                )}>
+                                  {notification.title}
+                                </p>
+                                {!notification.read && (
+                                  <div className="w-2 h-2 bg-accent rounded-full mt-1.5 flex-shrink-0" />
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {notification.message}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {new Date(notification.createdAt).toLocaleString('pt-BR', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await deleteNotification(notification.id);
+                              }}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </ScrollArea>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* Theme Toggle */}
           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
             <Button 
@@ -102,7 +259,7 @@ export function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
                 <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[280px] p-0">
+            <SheetContent side="left" className="w-[280px] p-0 glass-strong border-r border-sidebar-border">
               <div className="p-4 border-b border-border">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl gradient-indigo flex items-center justify-center">
@@ -114,7 +271,7 @@ export function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
                   </div>
                 </div>
               </div>
-              <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-80px)]">
+              <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-200px)]">
                 {menuItems.map((item, index) => (
                   <motion.button
                     key={item.id}
@@ -127,27 +284,88 @@ export function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative",
                       activeSection === item.id
-                        ? "bg-primary text-primary-foreground shadow-lg"
-                        : "text-foreground hover:bg-muted/50"
+                        ? cn(item.activeBg, "text-white shadow-lg")
+                        : cn("text-foreground hover:bg-muted/50", item.color)
                     )}
                   >
                     <motion.div
                       whileHover={{ rotate: [0, -10, 10, -10, 0] }}
                       transition={{ duration: 0.5 }}
+                      className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                        activeSection === item.id 
+                          ? "bg-white/20" 
+                          : "bg-muted/30"
+                      )}
                     >
-                      <item.icon className="w-5 h-5" />
+                      <item.icon className="w-4 h-4" />
                     </motion.div>
                     <span>{item.label}</span>
                     {activeSection === item.id && (
                       <motion.div
                         layoutId="mobileActiveIndicator"
-                        className="absolute left-0 top-0 bottom-0 w-1 bg-primary-foreground rounded-r-full"
+                        className={cn("absolute left-0 top-0 bottom-0 w-1 rounded-r-full", item.activeBg)}
                         transition={{ type: "spring", stiffness: 500, damping: 30 }}
                       />
                     )}
                   </motion.button>
                 ))}
               </nav>
+
+              {/* Profile Section */}
+              <div className="p-3 border-t border-border/50 space-y-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                        "text-foreground hover:bg-muted/50"
+                      )}
+                    >
+                      <div className="w-8 h-8 rounded-lg gradient-indigo flex items-center justify-center overflow-hidden">
+                        {user?.photoURL ? (
+                          isAvatarURL(user.photoURL) ? (
+                            <div className="w-full h-full flex items-center justify-center text-lg bg-gradient-to-br from-primary/20 to-primary/5">
+                              {getAvatarById(getAvatarIdFromURL(user.photoURL) || '')?.emoji || '👤'}
+                            </div>
+                          ) : (
+                            <img 
+                              src={user.photoURL} 
+                              alt={user.displayName || 'User'} 
+                              className="w-full h-full rounded-lg object-cover"
+                            />
+                          )
+                        ) : (
+                          <User className="w-4 h-4 text-primary-foreground" />
+                        )}
+                      </div>
+                      <span className="flex-1 text-left">{user?.displayName || user?.email || 'Meu Perfil'}</span>
+                    </motion.button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 z-[60]">
+                    <DropdownMenuLabel>Menu</DropdownMenuLabel>
+                    <DropdownMenuItem 
+                      className="cursor-pointer"
+                      onClick={() => {
+                        handleSectionChange('settings');
+                      }}
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Configurações
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={handleLogout}
+                      className="cursor-pointer text-destructive focus:text-destructive"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sair da Conta
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </SheetContent>
           </Sheet>
         </div>

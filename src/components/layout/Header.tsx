@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, Search, User, Moon, Sun, Settings, LogOut, Trophy, Award, Check, X, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { auth } from '@/lib/firebase';
 import { useTheme } from '@/hooks/useTheme';
 import { useNotifications } from '@/hooks/useNotifications';
 import { userStatsService } from '@/lib/firebase/userStats';
@@ -25,8 +26,13 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { isAvatarURL, getAvatarIdFromURL, getAvatarById } from '@/lib/utils/avatars';
 
-export function Header() {
+interface HeaderProps {
+  onSectionChange?: (section: string) => void;
+}
+
+export function Header({ onSectionChange }: HeaderProps) {
   const { userId, user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -50,9 +56,23 @@ export function Header() {
     const handleStatsUpdate = () => {
       loadStats();
     };
+    
+    // Listener para atualizar quando perfil mudar
+    const handleProfileUpdate = () => {
+      // Força recarregar o user
+      if (auth.currentUser) {
+        auth.currentUser.reload().catch(() => {
+          // Ignora erros
+        });
+      }
+    };
+    
     window.addEventListener('stats-updated', handleStatsUpdate);
+    window.addEventListener('user-profile-updated', handleProfileUpdate);
+    
     return () => {
       window.removeEventListener('stats-updated', handleStatsUpdate);
+      window.removeEventListener('user-profile-updated', handleProfileUpdate);
     };
   }, [userId]);
 
@@ -311,13 +331,19 @@ export function Header() {
               {/* Profile Header */}
               <div className="p-4 border-b border-border/50">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-full gradient-indigo flex items-center justify-center shadow-lg">
+                  <div className="w-12 h-12 rounded-full gradient-indigo flex items-center justify-center shadow-lg overflow-hidden">
                     {user?.photoURL ? (
-                      <img 
-                        src={user.photoURL} 
-                        alt={user.displayName || 'User'} 
-                        className="w-full h-full rounded-full object-cover"
-                      />
+                      isAvatarURL(user.photoURL) ? (
+                        <div className="w-full h-full flex items-center justify-center text-2xl bg-gradient-to-br from-primary/20 to-primary/5">
+                          {getAvatarById(getAvatarIdFromURL(user.photoURL) || '')?.emoji || '👤'}
+                        </div>
+                      ) : (
+                        <img 
+                          src={user.photoURL} 
+                          alt={user.displayName || 'User'} 
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      )
                     ) : (
                       <User className="w-6 h-6 text-primary-foreground" />
                     )}
@@ -381,7 +407,13 @@ export function Header() {
                   </span>
                 )}
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem 
+                className="cursor-pointer"
+                onClick={() => {
+                  setIsProfileOpen(false);
+                  onSectionChange?.('settings');
+                }}
+              >
                 <Settings className="w-4 h-4 mr-2" />
                 Configurações
               </DropdownMenuItem>

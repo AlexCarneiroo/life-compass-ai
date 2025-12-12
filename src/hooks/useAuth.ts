@@ -13,7 +13,24 @@ export function useAuth() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Listener para forçar atualização quando perfil mudar
+    const handleProfileUpdate = () => {
+      // Força recarregar o usuário atual
+      if (auth.currentUser) {
+        auth.currentUser.reload().then(() => {
+          setUser(auth.currentUser);
+        }).catch(() => {
+          // Ignora erros de reload
+        });
+      }
+    };
+
+    window.addEventListener('user-profile-updated', handleProfileUpdate);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('user-profile-updated', handleProfileUpdate);
+    };
   }, []);
 
   const loginWithEmail = async (email: string, password: string) => {

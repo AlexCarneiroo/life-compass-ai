@@ -1,0 +1,48 @@
+{
+  "name": "LifeOS - Sua vida em foco",
+  "short_name": "LifeOS",
+  "description": "App completo para gerenciar hábitos, humor, finanças e saúde. Evolua todos os dias.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "health", "lifestyle"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Check-in Diário",
+      "short_name": "Check-in",
+      "description": "Faça seu check-in diário",
+      "url": "/?section=checkin",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Hábitos",
+      "short_name": "Hábitos",
+      "description": "Gerencie seus hábitos",
+      "url": "/?section=habits",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
+

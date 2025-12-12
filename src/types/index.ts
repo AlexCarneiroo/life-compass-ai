@@ -14,6 +14,8 @@ export interface DailyCheckIn {
   moodReason?: string;
 }
 
+export type HabitDifficulty = 'very-easy' | 'easy' | 'normal' | 'hard' | 'very-hard' | 'extreme';
+
 export interface Habit {
   id: string;
   name: string;
@@ -21,7 +23,8 @@ export interface Habit {
   frequency: 'daily' | 'weekly' | 'monthly';
   streak: number;
   completedDates: string[];
-  xp: number;
+  xp: number; // Mantido para compatibilidade, mas será calculado automaticamente
+  difficulty: HabitDifficulty; // Nova propriedade
   category: string;
   color?: string; // Cor personalizada do hábito (hex)
 }

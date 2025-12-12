@@ -99,3 +99,4 @@ Após aplicar as regras:
 
 
 
+

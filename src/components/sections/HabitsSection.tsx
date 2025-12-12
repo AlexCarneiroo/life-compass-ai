@@ -18,6 +18,12 @@ import {
   getLast7Days, 
   isCompletedOnDate 
 } from '@/lib/utils/habits';
+import { 
+  DIFFICULTY_OPTIONS, 
+  getXPByDifficulty, 
+  getDefaultDifficulty,
+  HabitDifficulty 
+} from '@/lib/utils/habitDifficulty';
 import { Check, Flame, Plus, Trophy, Target, Star, Zap, MoreVertical, Edit, Trash2, Lock, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { DisciplineSimulator } from './DisciplineSimulator';
@@ -154,7 +160,7 @@ export function HabitsSection() {
     icon: '🎯',
     frequency: 'daily' as 'daily' | 'weekly' | 'monthly',
     category: 'Bem-estar',
-    xp: 100,
+    difficulty: getDefaultDifficulty() as HabitDifficulty,
     color: '',
   });
 
@@ -279,7 +285,7 @@ export function HabitsSection() {
         icon: habit.icon,
         frequency: habit.frequency,
         category: habit.category,
-        xp: habit.xp,
+        difficulty: habit.difficulty || getDefaultDifficulty(),
         color: habit.color || '',
       });
     } else {
@@ -289,7 +295,7 @@ export function HabitsSection() {
         icon: '🎯',
         frequency: 'daily',
         category: 'Bem-estar',
-        xp: 100,
+        difficulty: getDefaultDifficulty(),
         color: '',
       });
     }
@@ -304,7 +310,7 @@ export function HabitsSection() {
       icon: '🎯',
       frequency: 'daily',
       category: 'Bem-estar',
-      xp: 100,
+      difficulty: getDefaultDifficulty(),
       color: '',
     });
   };
@@ -316,6 +322,9 @@ export function HabitsSection() {
     }
 
     try {
+      // Calcula XP automaticamente baseado na dificuldade
+      const xpValue = getXPByDifficulty(formData.difficulty);
+      
       const habitData = {
         name: formData.name,
         icon: formData.icon,
@@ -323,7 +332,8 @@ export function HabitsSection() {
         category: formData.category,
         streak: 0,
         completedDates: [],
-        xp: formData.xp,
+        xp: xpValue,
+        difficulty: formData.difficulty,
         ...(formData.color && { color: formData.color }),
       };
 
@@ -376,6 +386,33 @@ export function HabitsSection() {
 
         // Marca como completo
         await habitsService.markComplete(habitId, date);
+        
+        // Marca também no desafio se houver um desafio ativo
+        try {
+          const activeChallenge = await disciplineChallengeService.getActiveForHabit(userId, habitId);
+          if (activeChallenge && activeChallenge.status === 'active') {
+            // Normaliza as datas para comparação (remove hora, mantém apenas data)
+            const challengeStart = activeChallenge.startDate.split('T')[0];
+            const challengeEnd = activeChallenge.endDate.split('T')[0];
+            const checkDate = date.split('T')[0];
+            
+            // Verifica se a data está dentro do período do desafio
+            if (checkDate >= challengeStart && checkDate <= challengeEnd) {
+              await disciplineChallengeService.markDayComplete(activeChallenge.id, checkDate);
+              // Verifica se completou o desafio
+              const updatedChallenge = await disciplineChallengeService.getActiveForHabit(userId, habitId);
+              if (updatedChallenge?.status === 'completed') {
+                toast.success('🏆 Desafio Completo!', {
+                  description: `Parabéns! Você completou ${activeChallenge.duration} dias de "${habit.name}"!`,
+                  duration: 8000,
+                });
+              }
+            }
+          }
+        } catch (error) {
+          // Ignora erros do desafio para não bloquear a marcação do hábito
+          console.error('Erro ao marcar dia no desafio:', error);
+        }
         
         // Adiciona XP apenas se for hoje
         if (date === today) {
@@ -497,14 +534,33 @@ export function HabitsSection() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="xp">XP</Label>
-                  <Input
-                    id="xp"
-                    type="number"
-                    min="1"
-                    value={formData.xp}
-                    onChange={(e) => setFormData({ ...formData, xp: parseInt(e.target.value) || 100 })}
-                  />
+                  <Label htmlFor="difficulty">Dificuldade</Label>
+                  <Select
+                    value={formData.difficulty}
+                    onValueChange={(value: HabitDifficulty) => 
+                      setFormData({ ...formData, difficulty: value })
+                    }
+                  >
+                    <SelectTrigger id="difficulty">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DIFFICULTY_OPTIONS.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{option.emoji}</span>
+                            <span>{option.label}</span>
+                            <span className="text-xs text-muted-foreground ml-auto">
+                              +{option.xp} XP
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {DIFFICULTY_OPTIONS.find(d => d.id === formData.difficulty)?.description}
+                  </p>
                 </div>
               </div>
 

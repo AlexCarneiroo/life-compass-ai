@@ -13,6 +13,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { checkinService } from '@/lib/firebase/checkin';
 import { userStatsService, checkAndGrantBadges } from '@/lib/firebase/userStats';
 import { DailyCheckIn } from '@/types';
+import { offlineCheckinService } from '@/lib/services/offlineCheckin';
+import { logger } from '@/lib/utils/logger';
 
 const moodReasons = [
   { id: 'work', label: 'Trabalho', icon: '💼' },
@@ -38,13 +40,16 @@ export function CheckinSection() {
   const [existingCheckin, setExistingCheckin] = useState<DailyCheckIn | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const totalSteps = 4;
 
   // Verifica se é o dia atual
-  const isToday = (date: string) => {
+  const isToday = (date: string | undefined | null) => {
+    if (!date) return false;
     const today = new Date().toISOString().split('T')[0];
-    return date === today;
+    const checkinDate = String(date).split('T')[0];
+    return checkinDate === today;
   };
 
   // Carrega check-in do dia se existir
@@ -53,6 +58,66 @@ export function CheckinSection() {
       loadTodayCheckin();
     }
   }, [userId]);
+
+  // Listener para atualizar quando check-in for salvo
+  useEffect(() => {
+    if (!userId) return;
+    
+    const handleCheckinSaved = () => {
+      // Aguarda um pouco e recarrega
+      setTimeout(() => {
+        loadTodayCheckin();
+      }, 1500);
+    };
+
+    window.addEventListener('checkin-saved', handleCheckinSaved);
+    return () => {
+      window.removeEventListener('checkin-saved', handleCheckinSaved);
+    };
+  }, [userId]);
+
+  // Detectar status online/offline
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncOfflineCheckins();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [userId]);
+
+  // Sincronizar check-ins offline quando voltar online
+  const syncOfflineCheckins = async () => {
+    if (!userId || !isOnline) return;
+
+    try {
+      const unsynced = offlineCheckinService.getUnsynced();
+      for (const checkin of unsynced) {
+        try {
+          const { synced, offlineId, ...checkinData } = checkin;
+          const firebaseId = await checkinService.create(checkinData, userId);
+          offlineCheckinService.markAsSynced(offlineId, firebaseId);
+          logger.log('Check-in sincronizado:', offlineId);
+        } catch (error) {
+          logger.error('Erro ao sincronizar check-in:', error);
+        }
+      }
+      offlineCheckinService.removeSynced();
+      if (unsynced.length > 0) {
+        toast.success(`${unsynced.length} check-in(s) sincronizado(s)!`);
+        loadTodayCheckin();
+      }
+    } catch (error) {
+      logger.error('Erro ao sincronizar check-ins offline:', error);
+    }
+  };
 
   const loadTodayCheckin = async () => {
     if (!userId) return;
@@ -63,6 +128,7 @@ export function CheckinSection() {
       
       if (checkin) {
         setExistingCheckin(checkin);
+        setIsEditing(false); // Garante que não está editando quando há check-in
         // Não preenche os campos automaticamente - só quando o usuário clicar em editar
       } else {
         // Se não há check-in, reseta o estado de edição e os campos
@@ -87,14 +153,16 @@ export function CheckinSection() {
     }
   };
 
+  // Função auxiliar para forçar recarregamento
+  const forceReload = async () => {
+    await loadTodayCheckin();
+  };
+
   const handleSave = async () => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayStr = today.toISOString().split('T')[0];
-      
-      // Verifica se já existe check-in hoje (usa o estado existente ou busca novamente)
-      const currentCheckin = existingCheckin || await checkinService.getByDate(userId, todayStr);
       
       const checkinData = {
         date: todayStr,
@@ -110,6 +178,20 @@ export function CheckinSection() {
         reflection,
         moodReason: moodReason || undefined,
       };
+
+      // Se estiver offline, salvar localmente
+      if (!isOnline) {
+        offlineCheckinService.saveOffline(checkinData);
+        toast.success('Check-in salvo offline!', {
+          description: 'Será sincronizado quando você voltar online.'
+        });
+        setIsEditing(false);
+        setStep(1);
+        return;
+      }
+      
+      // Verifica se já existe check-in hoje (usa o estado existente ou busca novamente)
+      const currentCheckin = existingCheckin || await checkinService.getByDate(userId, todayStr);
       
       if (currentCheckin) {
         // Sempre atualiza se já existe
@@ -117,9 +199,16 @@ export function CheckinSection() {
         toast.success('Check-in atualizado com sucesso!', {
           description: 'Seu progresso foi atualizado.'
         });
-        // Recarrega para atualizar o estado e sai do modo de edição
-        setIsEditing(false);
+        
+        // Aguarda um pouco para garantir que o Firebase processou
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Força recarregar o check-in do dia
         await loadTodayCheckin();
+        
+        // Sai do modo de edição e reseta o step
+        setIsEditing(false);
+        setStep(1);
       } else {
         // Só cria se não existe
         await checkinService.create(checkinData, userId);
@@ -147,14 +236,23 @@ export function CheckinSection() {
         toast.success('Check-in salvo com sucesso!', {
           description: 'Seu progresso foi registrado. Continue assim!'
         });
-        // Recarrega para mostrar que agora existe e sai do modo de edição
-        setIsEditing(false);
+        
+        // Aguarda um pouco para garantir que o Firebase processou
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Força recarregar o check-in do dia
         await loadTodayCheckin();
+        
+        // Garante que não está editando
+        setIsEditing(false);
+        setStep(1);
       }
       
-      // Dispara eventos para atualizar
-      window.dispatchEvent(new Event('checkin-saved'));
-      window.dispatchEvent(new Event('stats-updated'));
+      // Dispara eventos para atualizar (com delay para garantir que o Firebase processou)
+      setTimeout(() => {
+        window.dispatchEvent(new Event('checkin-saved'));
+        window.dispatchEvent(new Event('stats-updated'));
+      }, 500);
     } catch (error) {
       console.error('Erro ao salvar check-in:', error);
       toast.error('Erro ao salvar check-in');
@@ -447,7 +545,7 @@ export function CheckinSection() {
   };
 
   // Se há check-in do dia e não está editando, mostra o card de confirmação
-  if (existingCheckin && isToday(existingCheckin.date) && !isEditing) {
+  if (!loading && existingCheckin && isToday(existingCheckin.date) && !isEditing) {
     return (
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
@@ -461,17 +559,17 @@ export function CheckinSection() {
         </div>
 
         {/* Card de Check-in Concluído */}
-        <Card className="p-6 gradient-success border-success/20">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
-              <CheckCircle2 className="w-6 h-6 text-success" />
+        <Card className="p-4 sm:p-6 bg-emerald-500/10 dark:bg-emerald-500/5 border-emerald-500/20 dark:border-emerald-500/10">
+          <div className="flex flex-col sm:flex-row items-start gap-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/20 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xl font-bold text-success-foreground">
+            <div className="flex-1 w-full">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                <h3 className="text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-300">
                   Check-in do dia concluído! ✅
                 </h3>
-                <span className="text-xs text-success-foreground/80 bg-success/20 px-2 py-1 rounded-full">
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 dark:bg-emerald-500/10 px-2 py-1 rounded-full w-fit">
                   {new Date(existingCheckin.date).toLocaleDateString('pt-BR', { 
                     weekday: 'long', 
                     day: 'numeric', 
@@ -479,29 +577,29 @@ export function CheckinSection() {
                   })}
                 </span>
               </div>
-              <p className="text-success-foreground/80 mb-4">
+              <p className="text-emerald-700/80 dark:text-emerald-300/80 mb-4 text-sm sm:text-base">
                 Você já registrou seu check-in de hoje. Deseja editar alguma informação?
               </p>
               
               {/* Resumo do Check-in */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                <div className="bg-success/10 rounded-xl p-3 text-center">
-                  <span className="text-2xl block mb-1">{existingCheckin.moodEmoji}</span>
-                  <p className="text-xs text-success-foreground/80">Humor</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4">
+                <div className="bg-emerald-500/10 dark:bg-emerald-500/5 rounded-xl p-2 sm:p-3 text-center">
+                  <span className="text-xl sm:text-2xl block mb-1">{existingCheckin.moodEmoji}</span>
+                  <p className="text-xs text-emerald-700/70 dark:text-emerald-300/70">Humor</p>
                 </div>
-                <div className="bg-success/10 rounded-xl p-3 text-center">
-                  <span className="text-lg font-bold block mb-1">{existingCheckin.energy}/10</span>
-                  <p className="text-xs text-success-foreground/80">Energia</p>
+                <div className="bg-emerald-500/10 dark:bg-emerald-500/5 rounded-xl p-2 sm:p-3 text-center">
+                  <span className="text-base sm:text-lg font-bold block mb-1 text-emerald-700 dark:text-emerald-300">{existingCheckin.energy}/10</span>
+                  <p className="text-xs text-emerald-700/70 dark:text-emerald-300/70">Energia</p>
                 </div>
-                <div className="bg-success/10 rounded-xl p-3 text-center">
-                  <span className="text-lg font-bold block mb-1">
+                <div className="bg-emerald-500/10 dark:bg-emerald-500/5 rounded-xl p-2 sm:p-3 text-center">
+                  <span className="text-base sm:text-lg font-bold block mb-1 text-emerald-700 dark:text-emerald-300">
                     {existingCheckin.waterLiters?.toFixed(1) || (existingCheckin.waterGlasses ? (existingCheckin.waterGlasses * 0.25).toFixed(1) : '0.0')}L
                   </span>
-                  <p className="text-xs text-success-foreground/80">Água</p>
+                  <p className="text-xs text-emerald-700/70 dark:text-emerald-300/70">Água</p>
                 </div>
-                <div className="bg-success/10 rounded-xl p-3 text-center">
-                  <span className="text-lg font-bold block mb-1">{existingCheckin.sleepHours}h</span>
-                  <p className="text-xs text-success-foreground/80">Sono</p>
+                <div className="bg-emerald-500/10 dark:bg-emerald-500/5 rounded-xl p-2 sm:p-3 text-center">
+                  <span className="text-base sm:text-lg font-bold block mb-1 text-emerald-700 dark:text-emerald-300">{existingCheckin.sleepHours}h</span>
+                  <p className="text-xs text-emerald-700/70 dark:text-emerald-300/70">Sono</p>
                 </div>
               </div>
 
@@ -525,7 +623,7 @@ export function CheckinSection() {
                   setReflection(existingCheckin.reflection || '');
                 }}
                 variant="outline"
-                className="w-full bg-success-foreground/10 hover:bg-success-foreground/20 border-success-foreground/20 text-success-foreground"
+                className="w-full bg-emerald-500/10 dark:bg-emerald-500/5 hover:bg-emerald-500/20 dark:hover:bg-emerald-500/10 border-emerald-500/20 dark:border-emerald-500/10 text-emerald-700 dark:text-emerald-300"
               >
                 <Edit className="w-4 h-4 mr-2" />
                 Editar Check-in
@@ -548,7 +646,7 @@ export function CheckinSection() {
           </p>
         </div>
         {existingCheckin && isEditing && (
-          <span className="text-xs text-muted-foreground bg-primary/10 text-primary px-3 py-1.5 rounded-full">
+          <span className="text-xs text-muted-foreground bg-primary/10  px-3 py-1.5 rounded-full">
             Editando
           </span>
         )}

@@ -31,11 +31,56 @@ export const habitsService = {
   async getAll(userId: string): Promise<Habit[]> {
     const q = query(collection(db, COLLECTION), where('userId', '==', userId));
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      completedDates: doc.data().completedDates || [],
-    })) as Habit[];
+    
+    // Importa função de dificuldade
+    const { getXPByDifficulty, getDefaultDifficulty } = await import('../utils/habitDifficulty');
+    
+    return Promise.all(querySnapshot.docs.map(async (doc) => {
+      const data = doc.data();
+      // Compatibilidade: se não tiver difficulty, define como 'normal' e recalcula XP se necessário
+      let difficulty = data.difficulty || 'normal';
+      let xp = data.xp || 50;
+      let needsUpdate = false;
+      
+      // Se não tiver difficulty mas tiver XP, tenta inferir a dificuldade
+      if (!data.difficulty && data.xp) {
+        if (data.xp <= 10) difficulty = 'very-easy';
+        else if (data.xp <= 25) difficulty = 'easy';
+        else if (data.xp <= 50) difficulty = 'normal';
+        else if (data.xp <= 100) difficulty = 'hard';
+        else if (data.xp <= 200) difficulty = 'very-hard';
+        else difficulty = 'extreme';
+        needsUpdate = true;
+      } else if (!data.difficulty) {
+        difficulty = getDefaultDifficulty();
+        xp = getXPByDifficulty(difficulty);
+        needsUpdate = true;
+      } else if (data.difficulty && !data.xp) {
+        // Se tem difficulty mas não tem XP, recalcula
+        xp = getXPByDifficulty(data.difficulty as any);
+        needsUpdate = true;
+      }
+      
+      // Atualiza no Firebase se necessário (em background, não bloqueia)
+      if (needsUpdate) {
+        const habitRef = doc.ref;
+        updateDoc(habitRef, {
+          difficulty,
+          xp,
+          updatedAt: Timestamp.now(),
+        }).catch(err => {
+          console.error('Erro ao atualizar hábito com dificuldade:', err);
+        });
+      }
+      
+      return {
+        id: doc.id,
+        ...data,
+        completedDates: data.completedDates || [],
+        difficulty,
+        xp,
+      } as Habit;
+    }));
   },
 
   // Atualizar hábito

@@ -546,8 +546,8 @@ export function HealthSection() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2">
-            <span>💪</span> Saúde & Bem-estar
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <span className=''>💪</span> Saúde & Bem-estar
           </h1>
           <p className="text-muted-foreground mt-1">Monitore sua saúde física e mental</p>
         </div>

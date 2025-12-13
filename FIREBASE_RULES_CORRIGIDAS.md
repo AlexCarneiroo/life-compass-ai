@@ -100,3 +100,4 @@ Após aplicar as regras:
 
 
 
+

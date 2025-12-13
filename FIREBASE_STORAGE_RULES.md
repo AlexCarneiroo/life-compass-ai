@@ -94,3 +94,4 @@ Após configurar as regras:
 - Em desenvolvimento, pode usar regras permissivas
 - Em produção, sempre use regras restritivas com autenticação
 
+

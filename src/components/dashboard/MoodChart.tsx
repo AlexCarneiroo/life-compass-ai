@@ -95,8 +95,8 @@ export function MoodChart() {
   return (
     <Card variant="glass" className="col-span-2">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
+        <div className="flex-col items-center justify-between">
+          <CardTitle className="flex items-center mb-4 gap-2">
             <span>📈</span> Evolução Semanal
           </CardTitle>
           <div className="flex items-center gap-4 text-sm">

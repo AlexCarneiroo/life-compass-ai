@@ -67,7 +67,7 @@ export function CheckinSection() {
       // Aguarda um pouco e recarrega
       setTimeout(() => {
         loadTodayCheckin();
-      }, 1500);
+      }, 500);
     };
 
     window.addEventListener('checkin-saved', handleCheckinSaved);
@@ -640,7 +640,7 @@ export function CheckinSection() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Check-in Diário</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Check-in Diário</h1>
           <p className="text-muted-foreground mt-1">
             {existingCheckin && isEditing ? 'Editando seu check-in de hoje' : 'Registre seu dia e acompanhe seu progresso'}
           </p>

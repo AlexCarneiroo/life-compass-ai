@@ -75,3 +75,4 @@ A IA automaticamente detectará a chave e usará a API da OpenAI para respostas 
 
 
 
+

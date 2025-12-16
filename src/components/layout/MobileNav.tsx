@@ -115,16 +115,14 @@ export function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
         
         <div className="flex items-center gap-2">
           {/* Notifications */}
-          <DropdownMenu open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+          <DropdownMenu open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} modal={false}>
             <DropdownMenuTrigger asChild>
-              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                <Button variant="ghost" size="icon" className="rounded-xl relative">
-                  <Bell className="w-5 h-5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full" />
-                  )}
-                </Button>
-              </motion.div>
+              <Button variant="ghost" size="icon" className="rounded-xl relative z-50">
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full" />
+                )}
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[360px] p-0 glass-card border-border/50 z-[60]">
               <div className="p-4 border-b border-border/50">
@@ -237,25 +235,23 @@ export function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
           </DropdownMenu>
 
           {/* Theme Toggle */}
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={toggleTheme}
-              className="rounded-xl"
-              title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-5 h-5" />
-              ) : (
-                <Moon className="w-5 h-5" />
-              )}
-            </Button>
-          </motion.div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleTheme}
+            className="rounded-xl relative z-50"
+            title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-5 h-5" />
+            ) : (
+              <Moon className="w-5 h-5" />
+            )}
+          </Button>
           
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="relative z-50">
                 <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
@@ -314,7 +310,7 @@ export function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
 
               {/* Profile Section */}
               <div className="p-3 border-t border-border/50 space-y-1">
-                <DropdownMenu>
+                <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
                     <motion.button
                       whileHover={{ scale: 1.02 }}

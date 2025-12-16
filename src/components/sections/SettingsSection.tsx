@@ -32,7 +32,8 @@ import { toast } from 'sonner';
 import { logger } from '@/lib/utils/logger';
 import { cn } from '@/lib/utils';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
-import { Bell } from 'lucide-react';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { Bell, Clock } from 'lucide-react';
 import { AVATARS, getAvatarById, getAvatarURL, isAvatarURL, getAvatarIdFromURL } from '@/lib/utils/avatars';
 import {
   Dialog,
@@ -76,6 +77,18 @@ export function SettingsSection() {
   const [pinToDisable, setPinToDisable] = useState(''); // PIN para desabilitar
   const [pinToRemoveSection, setPinToRemoveSection] = useState<{ sectionId: string; pin: string } | null>(null); // PIN para remover seção
   const { permission: notificationPermission, isSupported: notificationsSupported, requestPermission: requestNotificationPermission } = useBrowserNotifications();
+  const { 
+    hasPermission: hasPushPermission, 
+    requestPermission: requestPushPermission, 
+    sendTestNotification,
+    scheduleCheckinReminder,
+    scheduleHabitReminders,
+  } = usePushNotifications();
+  
+  // Notification settings
+  const [checkinReminderTime, setCheckinReminderTime] = useState('21:00');
+  const [checkinReminderEnabled, setCheckinReminderEnabled] = useState(false);
+  const [habitRemindersEnabled, setHabitRemindersEnabled] = useState(false);
 
   // Seções disponíveis para proteção
   const availableSections = [
@@ -1240,12 +1253,13 @@ export function SettingsSection() {
               Notificações
             </CardTitle>
             <CardDescription>
-              Gerencie permissões de notificações do navegador
+              Gerencie permissões e lembretes automáticos
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {notificationsSupported ? (
               <>
+                {/* Permissão */}
                 <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                   <div>
                     <p className="font-medium">Permissão de Notificações</p>
@@ -1259,7 +1273,10 @@ export function SettingsSection() {
                   </div>
                   {notificationPermission !== 'granted' && (
                     <Button
-                      onClick={requestNotificationPermission}
+                      onClick={async () => {
+                        await requestNotificationPermission();
+                        await requestPushPermission();
+                      }}
                       variant={notificationPermission === 'denied' ? 'outline' : 'default'}
                       disabled={notificationPermission === 'denied'}
                     >
@@ -1269,17 +1286,120 @@ export function SettingsSection() {
                     </Button>
                   )}
                   {notificationPermission === 'granted' && (
-                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle className="w-5 h-5" />
-                      <span className="text-sm font-medium">Ativado</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle className="w-5 h-5" />
+                        <span className="text-sm font-medium">Ativado</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          const sent = await sendTestNotification();
+                          if (sent) {
+                            toast.success('Notificação de teste enviada!');
+                          } else {
+                            toast.error('Erro ao enviar notificação');
+                          }
+                        }}
+                      >
+                        Testar
+                      </Button>
                     </div>
                   )}
                 </div>
+                
                 {notificationPermission === 'denied' && (
                   <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm text-yellow-700 dark:text-yellow-400">
                     <p className="font-medium mb-1">Notificações bloqueadas</p>
                     <p>Para ativar, acesse as configurações do navegador e permita notificações para este site.</p>
                   </div>
+                )}
+
+                {notificationPermission === 'granted' && (
+                  <>
+                    <Separator />
+                    
+                    {/* Lembrete de Check-in */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                            <span className="text-lg">📝</span>
+                          </div>
+                          <div>
+                            <p className="font-medium">Lembrete de Check-in</p>
+                            <p className="text-sm text-muted-foreground">
+                              Receba um lembrete para fazer seu check-in diário
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={checkinReminderEnabled}
+                          onCheckedChange={(checked) => {
+                            setCheckinReminderEnabled(checked);
+                            if (checked) {
+                              scheduleCheckinReminder(checkinReminderTime);
+                              toast.success(`Lembrete agendado para ${checkinReminderTime}`);
+                            } else {
+                              toast.info('Lembrete de check-in desativado');
+                            }
+                          }}
+                        />
+                      </div>
+                      {checkinReminderEnabled && (
+                        <div className="flex items-center gap-2 ml-13 pl-13">
+                          <Clock className="w-4 h-4 text-muted-foreground" />
+                          <Input
+                            type="time"
+                            value={checkinReminderTime}
+                            onChange={(e) => {
+                              setCheckinReminderTime(e.target.value);
+                              scheduleCheckinReminder(e.target.value);
+                            }}
+                            className="w-32"
+                          />
+                          <span className="text-sm text-muted-foreground">Horário do lembrete</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Lembretes de Hábitos */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                            <span className="text-lg">🎯</span>
+                          </div>
+                          <div>
+                            <p className="font-medium">Lembretes de Hábitos</p>
+                            <p className="text-sm text-muted-foreground">
+                              Receba lembretes para hábitos com horário definido
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={habitRemindersEnabled}
+                          onCheckedChange={(checked) => {
+                            setHabitRemindersEnabled(checked);
+                            if (checked) {
+                              scheduleHabitReminders();
+                              toast.success('Lembretes de hábitos ativados');
+                            } else {
+                              toast.info('Lembretes de hábitos desativados');
+                            }
+                          }}
+                        />
+                      </div>
+                      {habitRemindersEnabled && (
+                        <div className="p-3 rounded-lg bg-muted/50 ml-13">
+                          <p className="text-sm text-muted-foreground">
+                            💡 Configure o horário de cada hábito na seção de Hábitos para receber lembretes personalizados.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </>
             ) : (

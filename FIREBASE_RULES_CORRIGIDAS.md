@@ -101,3 +101,4 @@ Após aplicar as regras:
 
 
 
+

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lifeos-v1';
+const CACHE_NAME = 'lifeos-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -96,5 +96,6 @@ self.addEventListener('notificationclick', (event) => {
     clients.openWindow('/')
   );
 });
+
 
 

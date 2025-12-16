@@ -1,13 +1,27 @@
 import { useState, useEffect } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { User, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { authService } from '@/lib/firebase/auth';
+import { toast } from 'sonner';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Captura resultado de redirect (login Google em mobile)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          toast.success('Login com Google realizado com sucesso!');
+        }
+      })
+      .catch((error) => {
+        if (error.code !== 'auth/popup-closed-by-user') {
+          toast.error('Erro ao fazer login com Google');
+        }
+      });
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);

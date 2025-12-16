@@ -27,6 +27,9 @@ export interface Habit {
   difficulty: HabitDifficulty; // Nova propriedade
   category: string;
   color?: string; // Cor personalizada do hábito (hex)
+  reminderTime?: string; // Horário do lembrete (HH:mm)
+  reminderEnabled?: boolean; // Se lembrete está ativo
+  description?: string; // Descrição opcional do hábito
 }
 
 export interface FinancialEntry {

@@ -24,7 +24,8 @@ import {
   getDefaultDifficulty,
   HabitDifficulty 
 } from '@/lib/utils/habitDifficulty';
-import { Check, Flame, Plus, Trophy, Target, Star, Zap, MoreVertical, Edit, Trash2, Lock, Sparkles } from 'lucide-react';
+import { Check, Flame, Plus, Trophy, Target, Star, Zap, MoreVertical, Edit, Trash2, Lock, Sparkles, Bell, Clock } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { DisciplineSimulator } from './DisciplineSimulator';
 import { disciplineChallengeService, DisciplineChallenge } from '@/lib/firebase/disciplineChallenge';
@@ -162,6 +163,9 @@ export function HabitsSection() {
     category: 'Bem-estar',
     difficulty: getDefaultDifficulty() as HabitDifficulty,
     color: '',
+    reminderTime: '',
+    reminderEnabled: false,
+    description: '',
   });
 
   const categories = ['all', ...new Set(habits.map(h => h.category))];
@@ -287,6 +291,9 @@ export function HabitsSection() {
         category: habit.category,
         difficulty: habit.difficulty || getDefaultDifficulty(),
         color: habit.color || '',
+        reminderTime: habit.reminderTime || '',
+        reminderEnabled: habit.reminderEnabled || false,
+        description: habit.description || '',
       });
     } else {
       setEditingHabit(null);
@@ -297,6 +304,9 @@ export function HabitsSection() {
         category: 'Bem-estar',
         difficulty: getDefaultDifficulty(),
         color: '',
+        reminderTime: '',
+        reminderEnabled: false,
+        description: '',
       });
     }
     setIsModalOpen(true);
@@ -312,6 +322,9 @@ export function HabitsSection() {
       category: 'Bem-estar',
       difficulty: getDefaultDifficulty(),
       color: '',
+      reminderTime: '',
+      reminderEnabled: false,
+      description: '',
     });
   };
 
@@ -335,6 +348,9 @@ export function HabitsSection() {
         xp: xpValue,
         difficulty: formData.difficulty,
         ...(formData.color && { color: formData.color }),
+        ...(formData.description && { description: formData.description }),
+        reminderEnabled: formData.reminderEnabled,
+        ...(formData.reminderEnabled && formData.reminderTime && { reminderTime: formData.reminderTime }),
       };
 
       if (editingHabit) {
@@ -580,6 +596,43 @@ export function HabitsSection() {
                     <SelectItem value="Produtividade">Produtividade</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Descrição (opcional)</Label>
+                <Input
+                  id="description"
+                  placeholder="Ex: 10 minutos de meditação guiada"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+              </div>
+
+              {/* Lembrete */}
+              <div className="space-y-3 p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-muted-foreground" />
+                    <Label htmlFor="reminderEnabled" className="cursor-pointer">Lembrete</Label>
+                  </div>
+                  <Switch
+                    id="reminderEnabled"
+                    checked={formData.reminderEnabled}
+                    onCheckedChange={(checked) => setFormData({ ...formData, reminderEnabled: checked })}
+                  />
+                </div>
+                {formData.reminderEnabled && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="time"
+                      value={formData.reminderTime}
+                      onChange={(e) => setFormData({ ...formData, reminderTime: e.target.value })}
+                      className="w-32"
+                    />
+                    <span className="text-sm text-muted-foreground">Horário do lembrete</span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

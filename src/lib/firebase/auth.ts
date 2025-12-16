@@ -4,6 +4,7 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
   User,
   sendPasswordResetEmail,
   updateProfile,
@@ -95,15 +96,29 @@ export const authService = {
   // Login com Google
   async loginWithGoogle(): Promise<User> {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      toast.success('Login com Google realizado com sucesso!');
-      return result.user;
+      // Detecta se é mobile para usar redirect ao invés de popup
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // Em mobile, usa redirect (não retorna resultado imediatamente)
+        await signInWithRedirect(auth, googleProvider);
+        // O resultado será capturado pelo getRedirectResult no useAuth
+        return auth.currentUser as User;
+      } else {
+        const result = await signInWithPopup(auth, googleProvider);
+        toast.success('Login com Google realizado com sucesso!');
+        return result.user;
+      }
     } catch (error: any) {
       logger.error('Erro ao fazer login com Google:', error);
       let errorMessage = 'Erro ao fazer login com Google';
       
       if (error.code === 'auth/popup-closed-by-user') {
         errorMessage = 'Login cancelado';
+      } else if (error.code === 'auth/popup-blocked') {
+        // Fallback para redirect se popup for bloqueado
+        await signInWithRedirect(auth, googleProvider);
+        return auth.currentUser as User;
       } else if (error.code === 'auth/account-exists-with-different-credential') {
         errorMessage = 'Uma conta já existe com este email';
       } else {

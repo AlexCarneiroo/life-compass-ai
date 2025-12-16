@@ -66,29 +66,29 @@ export function StatsCard({
       <Card 
         variant={isGradient ? undefined : 'default'}
         className={cn(
-          "p-5 card-hover rounded-xl",
+          "p-3 sm:p-5 card-hover rounded-xl h-full",
           isGradient && gradientClasses[variant],
           isGradient && "shadow-lg border-0",
           className
         )}
       >
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
           <p className={cn(
-            "text-sm font-medium",
+            "text-xs sm:text-sm font-medium truncate",
             isGradient ? `${textClasses[variant]} opacity-80` : "text-muted-foreground"
           )}>
             {title}
           </p>
           <p className={cn(
-            "text-3xl font-bold tracking-tight",
+            "text-xl sm:text-3xl font-bold tracking-tight",
             isGradient ? textClasses[variant] : "text-foreground"
           )}>
             {value}
           </p>
           {subtitle && (
             <p className={cn(
-              "text-xs",
+              "text-[10px] sm:text-xs truncate",
               isGradient ? `${textClasses[variant]} opacity-70` : "text-muted-foreground"
             )}>
               {subtitle}
@@ -96,8 +96,10 @@ export function StatsCard({
           )}
           {trend && (
             <div className={cn(
-              "flex items-center gap-1 text-xs font-medium",
-              trend.isPositive ? "text-success" : "text-destructive"
+              "flex items-center gap-1 text-[10px] sm:text-xs font-medium",
+              isGradient 
+                ? "text-black/80" 
+                : (trend.isPositive ? "text-success" : "text-destructive")
             )}>
               <span>{trend.isPositive ? '↑' : '↓'}</span>
               <span>{Math.abs(trend.value)}% vs semana passada</span>
@@ -106,12 +108,12 @@ export function StatsCard({
         </div>
         {(Icon || emoji) && (
           <div className={cn(
-            "w-12 h-12 rounded-xl flex items-center justify-center text-2xl",
+            "w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center text-lg sm:text-2xl flex-shrink-0",
             isGradient 
               ? "bg-white/20" 
               : "bg-muted"
           )}>
-            {emoji ? emoji : Icon && <Icon className={cn("w-6 h-6", isGradient ? textClasses[variant] : "text-primary")} />}
+            {emoji ? emoji : Icon && <Icon className={cn("w-4 h-4 sm:w-6 sm:h-6", isGradient ? textClasses[variant] : "text-primary")} />}
           </div>
         )}
       </div>

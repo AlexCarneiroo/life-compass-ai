@@ -4,6 +4,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fix para touch no mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, [role="button"] {
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
 @layer base {
   :root {
     /* Base colors - Slate (cinza azulado) */

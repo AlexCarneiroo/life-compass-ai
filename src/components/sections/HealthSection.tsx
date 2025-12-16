@@ -679,20 +679,25 @@ export function HealthSection() {
             </div>
             <p className="text-3xl font-bold mb-1">{workoutsThisWeek} de 7 dias</p>
             <div className="flex gap-1 mt-3">
-              {[1, 2, 3, 4, 5, 6, 7].map((day) => {
+              {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((dayName, index) => {
                 const today = new Date();
                 const dayDate = new Date(today);
-                dayDate.setDate(today.getDate() - (7 - day));
+                dayDate.setDate(today.getDate() - (6 - index));
                 const dayStr = dayDate.toISOString().split('T')[0];
                 const hasWorkout = checkIns.some(c => c.date === dayStr && c.workout);
                 return (
                   <div
-                    key={day}
-                    className={cn(
-                      "flex-1 h-8 rounded-lg transition-all",
-                      hasWorkout ? "bg-green-500" : "bg-muted"
-                    )}
-                  />
+                    key={index}
+                    className="flex-1 flex flex-col items-center gap-1"
+                  >
+                    <span className="text-[10px] text-muted-foreground font-medium">{dayName}</span>
+                    <div
+                      className={cn(
+                        "w-full h-6 rounded-lg transition-all",
+                        hasWorkout ? "bg-green-500" : "bg-muted"
+                      )}
+                    />
+                  </div>
                 );
               })}
             </div>

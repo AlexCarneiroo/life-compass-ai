@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { moodEmojis } from '@/lib/mockData';
+import { moodEmojis } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { 
   Droplet, Moon, Zap, DollarSign, Dumbbell, 
@@ -574,7 +574,7 @@ export function CheckinSection() {
                   Check-in do dia concluído! ✅
                 </h3>
                 <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 dark:bg-emerald-500/10 px-2 py-1 rounded-full w-fit">
-                  {new Date(existingCheckin.date).toLocaleDateString('pt-BR', { 
+                  {new Date(existingCheckin.date + 'T12:00:00').toLocaleDateString('pt-BR', { 
                     weekday: 'long', 
                     day: 'numeric', 
                     month: 'long' 

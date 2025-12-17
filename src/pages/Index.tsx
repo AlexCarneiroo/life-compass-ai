@@ -6,10 +6,12 @@ import { MobileNav } from '@/components/layout/MobileNav';
 import { DashboardSection } from '@/components/sections/DashboardSection';
 import { PINModal } from '@/components/ui/PINModal';
 import { useAuth } from '@/hooks/useAuth';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { userSettingsService } from '@/lib/firebase/userSettings';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RefreshCw } from 'lucide-react';
 
 // Lazy load componentes pesados
 const HabitsSection = lazy(() => import('@/components/sections/HabitsSection').then(m => ({ default: m.HabitsSection })));
@@ -65,6 +67,20 @@ const Index = () => {
   const [isPINModalOpen, setIsPINModalOpen] = useState(false);
   const [protectedSections, setProtectedSections] = useState<string[]>([]);
   const [verifiedSections, setVerifiedSections] = useState<Set<string>>(new Set());
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Pull to refresh (mobile)
+  const handleRefresh = useCallback(async () => {
+    setRefreshKey(prev => prev + 1);
+    // Pequeno delay para dar feedback visual
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }, []);
+
+  const { pullDistance, isRefreshing, progress, willRefresh } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 100,
+    cancelThreshold: 40,
+  });
 
   // Carregar seções protegidas
   useEffect(() => {
@@ -261,6 +277,42 @@ const Index = () => {
       {/* Mobile Navigation */}
       <MobileNav activeSection={activeSection} onSectionChange={handleSectionChange} />
       
+      {/* Pull to Refresh Indicator (Mobile) */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div 
+          className="lg:hidden fixed top-14 left-0 right-0 z-40 flex flex-col items-center pointer-events-none"
+          style={{ 
+            transform: `translateY(${Math.max(0, pullDistance - 30)}px)`,
+            opacity: Math.min(progress * 1.5, 1),
+          }}
+        >
+          <div className={cn(
+            "rounded-full p-3 shadow-lg transition-colors duration-200",
+            isRefreshing 
+              ? "bg-primary text-primary-foreground" 
+              : willRefresh 
+                ? "bg-green-500 text-white" 
+                : "bg-muted text-muted-foreground"
+          )}>
+            <RefreshCw className={cn(
+              "w-5 h-5 transition-transform duration-200",
+              isRefreshing && "animate-spin",
+              willRefresh && !isRefreshing && "rotate-180"
+            )} />
+          </div>
+          <span className={cn(
+            "text-xs mt-1 font-medium transition-colors",
+            willRefresh ? "text-green-500" : "text-muted-foreground"
+          )}>
+            {isRefreshing 
+              ? "Atualizando..." 
+              : willRefresh 
+                ? "Solte para atualizar" 
+                : "Puxe para atualizar"}
+          </span>
+        </div>
+      )}
+      
       <div className={cn(
         "transition-all duration-300",
         "lg:ml-64", // Desktop sidebar margin
@@ -273,7 +325,7 @@ const Index = () => {
         <main className="p-4 sm:p-6 lg:p-8">
           <AnimatePresence mode="wait">
             <motion.div
-              key={activeSection}
+              key={`${activeSection}-${refreshKey}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}

@@ -14,6 +14,7 @@ import {
   setDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { notificationsService } from './notifications';
 
 // Perfil público do usuário
 export interface PublicProfile {
@@ -201,10 +202,9 @@ export const socialService = {
 
   // ========== CONEXÕES ==========
 
-  async sendConnectionRequest(fromUserId: string, toUserId: string): Promise<string> {
+  async sendConnectionRequest(fromUserId: string, toUserId: string, fromUserName?: string): Promise<string> {
     const existing = await this.getConnection(fromUserId, toUserId);
     if (existing) {
-      // Se foi rejeitada, permite reenviar
       if (existing.status === 'rejected') {
         await deleteDoc(doc(db, CONNECTIONS_COLLECTION, existing.id));
       } else if (existing.status === 'accepted') {
@@ -221,13 +221,25 @@ export const socialService = {
       createdAt: Timestamp.now(),
     });
     
+    // Notifica o destinatário
+    const name = fromUserName || 'Alguém';
+    await notificationsService.notifyFriendRequest(toUserId, name, fromUserId);
+    
     return docRef.id;
   },
 
-  async acceptConnection(connectionId: string): Promise<void> {
-    await updateDoc(doc(db, CONNECTIONS_COLLECTION, connectionId), {
-      status: 'accepted',
-    });
+  async acceptConnection(connectionId: string, accepterName?: string): Promise<void> {
+    const connRef = doc(db, CONNECTIONS_COLLECTION, connectionId);
+    const connSnap = await getDoc(connRef);
+    
+    if (connSnap.exists()) {
+      const data = connSnap.data();
+      await updateDoc(connRef, { status: 'accepted' });
+      
+      // Notifica quem enviou a solicitação
+      const name = accepterName || 'Alguém';
+      await notificationsService.notifyFriendAccepted(data.fromUserId, name);
+    }
   },
 
   async rejectConnection(connectionId: string): Promise<void> {

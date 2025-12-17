@@ -24,7 +24,9 @@ import {
   AlertCircle,
   CheckCircle,
   Info,
-  Wrench
+  Wrench,
+  UserPlus,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -161,17 +163,23 @@ export function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
                 ) : (
                   <div className="divide-y divide-border/50">
                     {notifications.map((notification) => {
-                      const Icon = notification.type === 'negative' 
-                        ? AlertCircle 
-                        : notification.type === 'positive'
-                        ? CheckCircle
-                        : Info;
+                      // Mapeia tipos de notificação para ícones
+                      const getIcon = () => {
+                        switch (notification.type) {
+                          case 'friend_request': return UserPlus;
+                          case 'friend_accepted': return CheckCircle;
+                          case 'achievement': return Trophy;
+                          case 'level_up': return Zap;
+                          default: return Info;
+                        }
+                      };
+                      const Icon = getIcon();
                       
-                      const iconColor = notification.type === 'negative'
-                        ? 'text-red-500'
-                        : notification.type === 'positive'
+                      const iconColor = ['friend_accepted', 'achievement', 'level_up'].includes(notification.type)
                         ? 'text-green-500'
-                        : 'text-blue-500';
+                        : notification.type === 'friend_request'
+                        ? 'text-blue-500'
+                        : 'text-muted-foreground';
 
                       return (
                         <div

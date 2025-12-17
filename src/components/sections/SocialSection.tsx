@@ -92,9 +92,9 @@ export function SocialSection() {
 
   const handleSendRequest = async (toUserId: string) => {
     try {
-      await socialService.sendConnectionRequest(userId, toUserId);
+      const myName = user?.displayName || 'Usuário';
+      await socialService.sendConnectionRequest(userId, toUserId, myName);
       toast.success('Solicitação enviada!');
-      // Atualiza lista de busca
       setSearchResults(prev => prev.filter(p => p.id !== toUserId));
     } catch (error: any) {
       toast.error(error.message || 'Erro ao enviar solicitação');
@@ -103,7 +103,8 @@ export function SocialSection() {
 
   const handleAcceptRequest = async (connectionId: string) => {
     try {
-      await socialService.acceptConnection(connectionId);
+      const myName = user?.displayName || 'Usuário';
+      await socialService.acceptConnection(connectionId, myName);
       toast.success('Conexão aceita!');
       loadData();
     } catch (error) {
@@ -189,37 +190,39 @@ export function SocialSection() {
         <motion.div variants={itemVariants}>
           <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
             <CardContent className="p-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="w-16 h-16 border-2 border-primary">
+              <div className="flex items-center gap-3">
+                <Avatar className="w-12 h-12 sm:w-16 sm:h-16 border-2 border-primary shrink-0">
                   <AvatarImage src={myProfile.photoURL} />
-                  <AvatarFallback className="text-2xl">
+                  <AvatarFallback className="text-xl sm:text-2xl">
                     {myProfile.displayName.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg">{myProfile.displayName}</h3>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-base sm:text-lg truncate">{myProfile.displayName}</h3>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <Crown className="w-4 h-4 text-amber-500" />
+                      <Crown className="w-3 h-3 sm:w-4 sm:h-4 text-amber-500" />
                       Nível {myProfile.level}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Flame className="w-4 h-4 text-orange-500" />
+                      <Flame className="w-3 h-3 sm:w-4 sm:h-4 text-orange-500" />
                       {myProfile.currentStreak} dias
                     </span>
                     <span className="flex items-center gap-1">
-                      <Target className="w-4 h-4 text-purple-500" />
+                      <Target className="w-3 h-3 sm:w-4 sm:h-4 text-purple-500" />
                       {myProfile.totalHabitsCompleted} hábitos
                     </span>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  {myProfile.recentBadges.slice(0, 3).map(badge => (
-                    <div key={badge.id} className="text-2xl" title={badge.name}>
-                      {badge.icon}
-                    </div>
-                  ))}
-                </div>
+                {myProfile.recentBadges.length > 0 && (
+                  <div className="flex gap-1 shrink-0">
+                    {myProfile.recentBadges.slice(0, 3).map(badge => (
+                      <div key={badge.id} className="text-lg sm:text-2xl" title={badge.name}>
+                        {badge.icon}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

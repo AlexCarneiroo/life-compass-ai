@@ -1,44 +1,39 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './useAuth';
-import { notificationService, Notification } from '@/lib/firebase/notifications';
+import { notificationsService, AppNotification } from '@/lib/firebase/notifications';
 import { logger } from '@/lib/utils/logger';
+
+// Re-export para compatibilidade
+export type Notification = AppNotification;
 
 export function useNotifications() {
   const { userId } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  const loadNotifications = useCallback(async () => {
+  useEffect(() => {
     if (!userId) {
       setLoading(false);
       return;
     }
 
-    try {
-      const allNotifications = await notificationService.getAll(userId);
-      setNotifications(allNotifications);
-    } catch (error) {
-      logger.error('Erro ao carregar notificações:', error);
-      setNotifications([]);
-    } finally {
+    // Subscribe para atualizações em tempo real
+    unsubscribeRef.current = notificationsService.subscribe(userId, (newNotifications) => {
+      setNotifications(newNotifications);
       setLoading(false);
-    }
+    });
+
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
   }, [userId]);
-
-  useEffect(() => {
-    loadNotifications();
-    
-    // Recarregar notificações a cada 5 minutos
-    const interval = setInterval(() => {
-      loadNotifications();
-    }, 5 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [loadNotifications]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
-      await notificationService.markAsRead(notificationId);
+      await notificationsService.markAsRead(notificationId);
       setNotifications(prev => 
         prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
       );
@@ -51,7 +46,7 @@ export function useNotifications() {
     if (!userId) return;
     
     try {
-      await notificationService.markAllAsRead(userId);
+      await notificationsService.markAllAsRead(userId);
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (error) {
       logger.error('Erro ao marcar todas como lidas:', error);
@@ -60,12 +55,22 @@ export function useNotifications() {
 
   const deleteNotification = useCallback(async (notificationId: string) => {
     try {
-      await notificationService.delete(notificationId);
+      await notificationsService.delete(notificationId);
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
     } catch (error) {
       logger.error('Erro ao deletar notificação:', error);
     }
   }, []);
+
+  const refresh = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const all = await notificationsService.getAll(userId);
+      setNotifications(all);
+    } catch (error) {
+      logger.error('Erro ao recarregar notificações:', error);
+    }
+  }, [userId]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -76,6 +81,6 @@ export function useNotifications() {
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    refresh: loadNotifications,
+    refresh,
   };
 }

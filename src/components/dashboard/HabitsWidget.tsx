@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Check, Flame } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -116,7 +117,9 @@ export function HabitsWidget() {
       </CardHeader>
       <CardContent className="space-y-2">
         {loading ? (
-          <p className="text-sm text-muted-foreground text-center py-4">Carregando hábitos...</p>
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+          </div>
         ) : habits.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">Nenhum hábito ainda. Crie seu primeiro hábito!</p>
         ) : (

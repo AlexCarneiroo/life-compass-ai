@@ -42,10 +42,10 @@ function BadgeCount({ userId }: { userId: string }) {
   }, [userId]);
 
   return (
-    <>
-      <p className="text-2xl font-bold">{count}</p>
-      <p className="text-sm text-muted-foreground">Conquistas</p>
-    </>
+    <div>
+      <p className="text-xl font-bold">{count}</p>
+      <p className="text-xs text-muted-foreground">Conquistas</p>
+    </div>
   );
 }
 
@@ -707,48 +707,48 @@ export function HabitsSection() {
         </Dialog>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card variant="gradient" className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl gradient-orange flex items-center justify-center">
-              <Flame className="w-6 h-6 text-orange-foreground" />
+      {/* Stats Cards - Grid 2x2 */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card variant="gradient" className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-lg gradient-orange flex items-center justify-center">
+              <Flame className="w-5 h-5 text-orange-foreground" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{maxStreak}</p>
-              <p className="text-sm text-muted-foreground">Maior sequência</p>
+              <p className="text-xl font-bold">{maxStreak}</p>
+              <p className="text-xs text-muted-foreground">Maior sequência</p>
             </div>
           </div>
         </Card>
         
-        <Card variant="gradient" className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl gradient-blue flex items-center justify-center">
-              <Target className="w-6 h-6 text-blue-foreground" />
+        <Card variant="gradient" className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-lg gradient-blue flex items-center justify-center">
+              <Target className="w-5 h-5 text-blue-foreground" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{completedToday.length}/{habits.length}</p>
-              <p className="text-sm text-muted-foreground">Completados hoje</p>
+              <p className="text-xl font-bold">{completedToday.length}/{habits.length}</p>
+              <p className="text-xs text-muted-foreground">Completados hoje</p>
             </div>
           </div>
         </Card>
         
-        <Card variant="gradient" className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl gradient-success flex items-center justify-center">
-              <Zap className="w-6 h-6 text-success-foreground" />
+        <Card variant="gradient" className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-lg gradient-success flex items-center justify-center">
+              <Zap className="w-5 h-5 text-success-foreground" />
             </div>
             <div>
-              <p className="text-2xl font-bold">+{completedXP}</p>
-              <p className="text-sm text-muted-foreground">XP ganho hoje</p>
+              <p className="text-xl font-bold">+{completedXP}</p>
+              <p className="text-xs text-muted-foreground">XP ganho hoje</p>
             </div>
           </div>
         </Card>
         
-        <Card variant="gradient" className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl gradient-indigo flex items-center justify-center">
-              <Trophy className="w-6 h-6 text-indigo-foreground" />
+        <Card variant="gradient" className="p-3">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-lg gradient-indigo flex items-center justify-center">
+              <Trophy className="w-5 h-5 text-indigo-foreground" />
             </div>
             <BadgeCount userId={userId} />
           </div>

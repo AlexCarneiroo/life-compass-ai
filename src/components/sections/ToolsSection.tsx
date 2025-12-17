@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Timer, 
   FileText, 
-  Calculator, 
+  Calculator as CalculatorIcon, 
   Play, 
   Pause, 
   RotateCcw, 
@@ -368,6 +368,7 @@ function NotesManager() {
       const noteId = await notesService.create({
         title: 'Nova Nota',
         content: '',
+        userId,
       }, userId);
       
       await loadNotes();
@@ -720,7 +721,7 @@ function Calculator() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Calculator className="w-5 h-5 text-primary" />
+          <CalculatorIcon className="w-5 h-5 text-primary" />
           Calculadora
         </CardTitle>
         <CardDescription>
@@ -785,7 +786,7 @@ export function ToolsSection() {
             Notas
           </TabsTrigger>
           <TabsTrigger value="calculator" className="gap-2">
-            <Calculator className="w-4 h-4" />
+            <CalculatorIcon className="w-4 h-4" />
             Calculadora
           </TabsTrigger>
         </TabsList>

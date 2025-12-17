@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { expenseCategories } from '@/lib/mockData';
+import { Skeleton } from '@/components/ui/skeleton';
+import { expenseCategories } from '@/lib/constants';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from 'recharts';
 import { useAuth } from '@/hooks/useAuth';
@@ -65,6 +66,20 @@ export function FinanceWidget() {
   });
 
   const recentTransactions = entries.slice(0, 4);
+
+  if (loading) {
+    return (
+      <Card variant="glass">
+        <CardHeader className="pb-3">
+          <Skeleton className="h-6 w-32" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card variant="glass">

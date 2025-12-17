@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { moodEmojis } from '@/lib/mockData';
+import { Skeleton } from '@/components/ui/skeleton';
+import { moodEmojis } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Droplet, Moon, Zap, Dumbbell } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -126,6 +127,21 @@ export function QuickCheckin() {
       toast.error('Erro ao salvar check-in');
     }
   };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <Skeleton className="h-6 w-40" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

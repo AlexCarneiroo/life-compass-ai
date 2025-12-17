@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkles, Flame, Trophy, Target } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { userStatsService } from '@/lib/firebase/userStats';
 import { UserStats } from '@/types';
 import { cn } from '@/lib/utils';
+import { getAvatarById, isAvatarURL, getAvatarIdFromURL } from '@/lib/utils/avatars';
 
 // Cores de borda baseadas no nível
 const levelBorderColors: Record<number, string> = {
@@ -33,8 +35,23 @@ const levelGlowColors: Record<number, string> = {
   10: 'shadow-yellow-300/40',
 };
 
+// Cores de fundo do badge de nível (mesmas cores da borda)
+const levelBadgeColors: Record<number, string> = {
+  1: 'bg-slate-500',
+  2: 'bg-emerald-500',
+  3: 'bg-blue-500',
+  4: 'bg-indigo-500',
+  5: 'bg-purple-500',
+  6: 'bg-pink-500',
+  7: 'bg-orange-500',
+  8: 'bg-amber-500',
+  9: 'bg-yellow-400',
+  10: 'bg-yellow-300',
+};
+
 export function LevelProgress() {
-  const { userId } = useAuth();
+  const { userId, user } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<UserStats>({
     level: 1,
     xp: 0,
@@ -46,7 +63,7 @@ export function LevelProgress() {
   });
 
   useEffect(() => {
-    loadStats();
+    if (userId) loadStats();
   }, [userId]);
 
   const loadStats = async () => {
@@ -55,8 +72,17 @@ export function LevelProgress() {
       setStats(userStats);
     } catch (error) {
       console.error('Erro ao carregar stats:', error);
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Pega o avatar do usuário
+  const photoURL = user?.photoURL || '';
+  const avatarEmoji = photoURL && isAvatarURL(photoURL) 
+    ? getAvatarById(getAvatarIdFromURL(photoURL) || '')?.emoji 
+    : null;
+  const userInitial = (user?.displayName || user?.email || 'U').charAt(0).toUpperCase();
 
   const { level, xp, xpToNextLevel, currentStreak, longestStreak, badges } = stats;
   const progressPercent = xpToNextLevel > 0 ? (xp / (xp + xpToNextLevel)) * 100 : 0;
@@ -77,6 +103,24 @@ export function LevelProgress() {
   // Pega a cor da borda baseada no nível (máximo 10)
   const borderColor = levelBorderColors[Math.min(level, 10)] || levelBorderColors[10];
   const glowColor = levelGlowColors[Math.min(level, 10)] || levelGlowColors[10];
+  const badgeColor = levelBadgeColors[Math.min(level, 10)] || levelBadgeColors[10];
+
+  if (loading) {
+    return (
+      <Card className="col-span-full border-2">
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row items-center gap-6">
+            <Skeleton className="w-24 h-24 rounded-2xl" />
+            <div className="flex-1 space-y-3">
+              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-3 w-full" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className={cn(
@@ -89,10 +133,17 @@ export function LevelProgress() {
           {/* Avatar & Level */}
           <div className="relative">
             <div className="w-24 h-24 rounded-2xl gradient-indigo flex items-center justify-center shadow-glow animate-bounce-soft">
-              <span className="text-4xl">🧙‍♂️</span>
+              {avatarEmoji ? (
+                <span className="text-4xl">{avatarEmoji}</span>
+              ) : (
+                <span className="text-4xl font-bold text-indigo-foreground">{userInitial}</span>
+              )}
             </div>
-            <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl gradient-pink flex items-center justify-center shadow-md">
-              <span className="text-lg font-bold text-pink-foreground">{level}</span>
+            <div className={cn(
+              "absolute -bottom-2 -right-2 w-10 h-10 rounded-xl flex items-center justify-center shadow-md",
+              badgeColor
+            )}>
+              <span className="text-lg font-bold text-white">{level}</span>
             </div>
           </div>
 

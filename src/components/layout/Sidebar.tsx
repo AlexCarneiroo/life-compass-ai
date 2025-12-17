@@ -4,21 +4,17 @@ import { cn } from '@/lib/utils';
 import { 
   LayoutDashboard, 
   Target, 
-  Heart, 
   Wallet, 
-  Activity, 
   CheckSquare, 
   Brain, 
   Clock, 
   Dumbbell, 
   BarChart3, 
-  Briefcase, 
   BookOpen,
   ChevronLeft,
   ChevronRight,
   Sparkles,
   Settings,
-  Wrench,
   Trophy,
   Users
 } from 'lucide-react';
@@ -33,13 +29,11 @@ const menuItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Visão da Vida', color: 'text-indigo-500', activeBg: 'bg-indigo-500' },
   { id: 'checkin', icon: CheckSquare, label: 'Check-in Diário', color: 'text-emerald-500', activeBg: 'bg-emerald-500' },
   { id: 'habits', icon: Target, label: 'Hábitos', color: 'text-purple-500', activeBg: 'bg-purple-500' },
-  // { id: 'mood', icon: Heart, label: 'Humor & Emoções', color: 'text-pink-500', activeBg: 'bg-pink-500' }, // Arquivado
   { id: 'finance', icon: Wallet, label: 'Financeiro', color: 'text-blue-500', activeBg: 'bg-blue-500' },
   { id: 'goals', icon: Sparkles, label: 'Metas & Objetivos', color: 'text-yellow-500', activeBg: 'bg-yellow-500' },
   { id: 'health', icon: Dumbbell, label: 'Saúde', color: 'text-orange-500', activeBg: 'bg-orange-500' },
   { id: 'routines', icon: Clock, label: 'Rotinas', color: 'text-cyan-500', activeBg: 'bg-cyan-500' },
   { id: 'journal', icon: BookOpen, label: 'Diário', color: 'text-rose-500', activeBg: 'bg-rose-500' },
-  // { id: 'work', icon: Briefcase, label: 'Vida Profissional', color: 'text-slate-500', activeBg: 'bg-slate-500' }, // Arquivado
   { id: 'ai', icon: Brain, label: 'IA Coach', color: 'text-violet-500', activeBg: 'bg-violet-500' },
   { id: 'reports', icon: BarChart3, label: 'Relatórios', color: 'text-teal-500', activeBg: 'bg-teal-500' },
   { id: 'achievements', icon: Trophy, label: 'Conquistas', color: 'text-amber-500', activeBg: 'bg-amber-500' },

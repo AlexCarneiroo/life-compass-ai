@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { motion } from 'framer-motion';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { MoodChart } from '@/components/dashboard/MoodChart';
@@ -13,28 +13,44 @@ import { checkinService } from '@/lib/firebase/checkin';
 import { habitsService } from '@/lib/firebase/habits';
 import { financeService } from '@/lib/firebase/finance';
 import { DailyCheckIn, Habit, FinancialEntry } from '@/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1
+      staggerChildren: 0.05
     }
   }
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 10 },
   visible: { 
     opacity: 1, 
     y: 0,
-    transition: { duration: 0.4 }
+    transition: { duration: 0.2 }
   }
 };
 
+// Skeleton de loading
+const DashboardSkeleton = memo(() => (
+  <div className="space-y-4">
+    <Skeleton className="h-32 w-full" />
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
+    </div>
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Skeleton className="h-64" />
+      <Skeleton className="h-64" />
+    </div>
+  </div>
+));
+
 export function DashboardSection() {
   const { userId } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [weeklyStats, setWeeklyStats] = useState({
     averageMood: 0,
     averageProductivity: 0,
@@ -44,7 +60,9 @@ export function DashboardSection() {
   });
 
   useEffect(() => {
-    loadWeeklyStats();
+    if (userId) {
+      loadWeeklyStats();
+    }
   }, [userId]);
 
   const loadWeeklyStats = async () => {
@@ -55,12 +73,14 @@ export function DashboardSection() {
       const todayStr = today.toISOString().split('T')[0];
       const weekAgoStr = weekAgo.toISOString().split('T')[0];
       
-      // Busca check-ins da última semana
-      const allCheckIns = await checkinService.getAll(userId);
-      const last7Days = allCheckIns.filter(c => c.date >= weekAgoStr && c.date <= todayStr);
+      // Busca todos os dados em paralelo
+      const [allCheckIns, habits, allEntries] = await Promise.all([
+        checkinService.getAll(userId),
+        habitsService.getAll(userId),
+        financeService.getAll(userId),
+      ]);
       
-      // Busca hábitos
-      const habits = await habitsService.getAll(userId);
+      const last7Days = allCheckIns.filter(c => c.date >= weekAgoStr && c.date <= todayStr);
       
       // Conta hábitos completados na semana
       const habitsCompletedThisWeek = habits.reduce((count, habit) => {
@@ -70,7 +90,7 @@ export function DashboardSection() {
         return count + completedThisWeek;
       }, 0);
 
-      // Calcula médias (mood está em escala 1-6)
+      // Calcula médias
       const moods = last7Days.map(c => c.mood).filter(m => m > 0);
       const productivities = last7Days.map(c => c.productivity).filter(p => p > 0);
       
@@ -81,18 +101,10 @@ export function DashboardSection() {
         ? productivities.reduce((a, b) => a + b, 0) / productivities.length
         : 0;
 
-      // Busca transações financeiras da última semana
-      const allEntries = await financeService.getAll(userId);
-      const last7DaysEntries = allEntries.filter(e => {
-        return e.date >= weekAgoStr && e.date <= todayStr;
-      });
-
-      const totalIncome = last7DaysEntries
-        .filter(e => e.type === 'income')
-        .reduce((sum, e) => sum + e.amount, 0);
-      const totalExpenses = last7DaysEntries
-        .filter(e => e.type === 'expense')
-        .reduce((sum, e) => sum + e.amount, 0);
+      // Calcula finanças da semana
+      const last7DaysEntries = allEntries.filter(e => e.date >= weekAgoStr && e.date <= todayStr);
+      const totalIncome = last7DaysEntries.filter(e => e.type === 'income').reduce((sum, e) => sum + e.amount, 0);
+      const totalExpenses = last7DaysEntries.filter(e => e.type === 'expense').reduce((sum, e) => sum + e.amount, 0);
 
       setWeeklyStats({
         averageMood,
@@ -103,16 +115,14 @@ export function DashboardSection() {
       });
     } catch (error) {
       console.error('Erro ao carregar estatísticas semanais:', error);
-      // Define valores padrão em caso de erro
-      setWeeklyStats({
-        averageMood: 0,
-        averageProductivity: 0,
-        habitsCompleted: 0,
-        totalIncome: 0,
-        totalExpenses: 0,
-      });
+    } finally {
+      setLoading(false);
     }
   };
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <motion.div 

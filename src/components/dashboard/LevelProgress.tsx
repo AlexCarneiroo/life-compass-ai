@@ -4,6 +4,34 @@ import { Sparkles, Flame, Trophy, Target } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { userStatsService } from '@/lib/firebase/userStats';
 import { UserStats } from '@/types';
+import { cn } from '@/lib/utils';
+
+// Cores de borda baseadas no nível
+const levelBorderColors: Record<number, string> = {
+  1: 'border-slate-400/30',
+  2: 'border-emerald-500/40',
+  3: 'border-blue-500/40',
+  4: 'border-indigo-500/40',
+  5: 'border-purple-500/50',
+  6: 'border-pink-500/50',
+  7: 'border-orange-500/50',
+  8: 'border-amber-500/60',
+  9: 'border-yellow-400/60',
+  10: 'border-yellow-300/70',
+};
+
+const levelGlowColors: Record<number, string> = {
+  1: '',
+  2: 'shadow-emerald-500/10',
+  3: 'shadow-blue-500/10',
+  4: 'shadow-indigo-500/15',
+  5: 'shadow-purple-500/15',
+  6: 'shadow-pink-500/20',
+  7: 'shadow-orange-500/20',
+  8: 'shadow-amber-500/25',
+  9: 'shadow-yellow-400/30',
+  10: 'shadow-yellow-300/40',
+};
 
 export function LevelProgress() {
   const { userId } = useAuth();
@@ -46,8 +74,16 @@ export function LevelProgress() {
     10: 'Transcendente',
   };
 
+  // Pega a cor da borda baseada no nível (máximo 10)
+  const borderColor = levelBorderColors[Math.min(level, 10)] || levelBorderColors[10];
+  const glowColor = levelGlowColors[Math.min(level, 10)] || levelGlowColors[10];
+
   return (
-    <Card className="col-span-full">
+    <Card className={cn(
+      "col-span-full border-2 transition-all duration-500",
+      borderColor,
+      glowColor && `shadow-lg ${glowColor}`
+    )}>
       <CardContent className="p-6">
         <div className="flex flex-col lg:flex-row items-center gap-6">
           {/* Avatar & Level */}

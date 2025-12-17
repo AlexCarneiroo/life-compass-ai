@@ -22,6 +22,8 @@ const JournalSection = lazy(() => import('@/components/sections/JournalSection')
 const AICoachSection = lazy(() => import('@/components/sections/AICoachSection').then(m => ({ default: m.AICoachSection })));
 const ReportsSection = lazy(() => import('@/components/sections/ReportsSection').then(m => ({ default: m.ReportsSection })));
 const SettingsSection = lazy(() => import('@/components/sections/SettingsSection').then(m => ({ default: m.SettingsSection })));
+const AchievementsSection = lazy(() => import('@/components/sections/AchievementsSection').then(m => ({ default: m.AchievementsSection })));
+const SocialSection = lazy(() => import('@/components/sections/SocialSection').then(m => ({ default: m.SocialSection })));
 
 // Componente de loading skeleton
 const SectionSkeleton = () => (
@@ -52,6 +54,8 @@ const sectionNames: Record<string, string> = {
   reports: 'Relatórios',
   tools: 'Ferramentas',
   settings: 'Configurações',
+  achievements: 'Conquistas',
+  social: 'Comunidade',
 };
 
 const Index = () => {
@@ -228,6 +232,18 @@ const Index = () => {
         return (
           <Suspense fallback={<SectionSkeleton />}>
             <SettingsSection />
+          </Suspense>
+        );
+      case 'achievements':
+        return (
+          <Suspense fallback={<SectionSkeleton />}>
+            <AchievementsSection />
+          </Suspense>
+        );
+      case 'social':
+        return (
+          <Suspense fallback={<SectionSkeleton />}>
+            <SocialSection />
           </Suspense>
         );
       default:

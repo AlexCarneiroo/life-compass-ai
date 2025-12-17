@@ -1,0 +1,217 @@
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useAuth } from '@/hooks/useAuth';
+import { userStatsService } from '@/lib/firebase/userStats';
+import { Badge } from '@/types';
+import { Trophy, Star, Flame, Target, Zap, Award, Crown, Medal } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+// Definição de todas as conquistas possíveis
+const ALL_ACHIEVEMENTS = [
+  { id: 'first_checkin', name: 'Primeiro Passo', description: 'Complete seu primeiro check-in', icon: '🎯', category: 'Início' },
+  { id: 'week_streak', name: 'Semana Perfeita', description: 'Complete 7 dias seguidos de check-in', icon: '🔥', category: 'Consistência' },
+  { id: 'month_streak', name: 'Mês de Ouro', description: 'Complete 30 dias seguidos de check-in', icon: '👑', category: 'Consistência' },
+  { id: 'first_habit', name: 'Construtor de Hábitos', description: 'Complete seu primeiro hábito', icon: '✅', category: 'Hábitos' },
+  { id: 'habit_master', name: 'Mestre dos Hábitos', description: 'Complete 100 hábitos no total', icon: '🏆', category: 'Hábitos' },
+  { id: 'habit_streak_7', name: 'Sequência de 7', description: 'Mantenha um hábito por 7 dias seguidos', icon: '⚡', category: 'Hábitos' },
+  { id: 'habit_streak_30', name: 'Sequência de 30', description: 'Mantenha um hábito por 30 dias seguidos', icon: '💪', category: 'Hábitos' },
+  { id: 'level_5', name: 'Nível 5', description: 'Alcance o nível 5', icon: '⭐', category: 'Progressão' },
+  { id: 'level_10', name: 'Nível 10', description: 'Alcance o nível 10', icon: '🌟', category: 'Progressão' },
+  { id: 'level_25', name: 'Veterano', description: 'Alcance o nível 25', icon: '🎖️', category: 'Progressão' },
+  { id: 'level_50', name: 'Lenda', description: 'Alcance o nível 50', icon: '👑', category: 'Progressão' },
+  { id: 'first_goal', name: 'Sonhador', description: 'Crie sua primeira meta', icon: '🎯', category: 'Metas' },
+  { id: 'goal_complete', name: 'Realizador', description: 'Complete uma meta', icon: '🏅', category: 'Metas' },
+  { id: 'workout_week', name: 'Atleta', description: 'Treine 7 dias em uma semana', icon: '🏋️', category: 'Saúde' },
+  { id: 'early_bird', name: 'Madrugador', description: 'Faça check-in antes das 7h', icon: '🌅', category: 'Especial' },
+  { id: 'night_owl', name: 'Coruja', description: 'Faça check-in após às 23h', icon: '🦉', category: 'Especial' },
+  { id: 'perfect_mood', name: 'Dia Perfeito', description: 'Registre humor máximo (6)', icon: '😊', category: 'Bem-estar' },
+  { id: 'hydration_master', name: 'Hidratado', description: 'Beba 3L de água em um dia', icon: '💧', category: 'Saúde' },
+  { id: 'sleep_champion', name: 'Dorminhoco', description: 'Durma 8h por 7 dias seguidos', icon: '😴', category: 'Saúde' },
+  { id: 'journal_writer', name: 'Escritor', description: 'Escreva 10 entradas no diário', icon: '📝', category: 'Diário' },
+];
+
+const categoryIcons: Record<string, React.ReactNode> = {
+  'Início': <Star className="w-5 h-5" />,
+  'Consistência': <Flame className="w-5 h-5" />,
+  'Hábitos': <Target className="w-5 h-5" />,
+  'Progressão': <Zap className="w-5 h-5" />,
+  'Metas': <Award className="w-5 h-5" />,
+  'Saúde': <Medal className="w-5 h-5" />,
+  'Especial': <Crown className="w-5 h-5" />,
+  'Bem-estar': <Trophy className="w-5 h-5" />,
+  'Diário': <Trophy className="w-5 h-5" />,
+};
+
+const categoryColors: Record<string, string> = {
+  'Início': 'from-blue-500 to-blue-600',
+  'Consistência': 'from-orange-500 to-red-500',
+  'Hábitos': 'from-purple-500 to-purple-600',
+  'Progressão': 'from-yellow-500 to-amber-500',
+  'Metas': 'from-emerald-500 to-green-500',
+  'Saúde': 'from-pink-500 to-rose-500',
+  'Especial': 'from-indigo-500 to-violet-500',
+  'Bem-estar': 'from-cyan-500 to-teal-500',
+  'Diário': 'from-amber-500 to-orange-500',
+};
+
+export function AchievementsSection() {
+  const { userId } = useAuth();
+  const [earnedBadges, setEarnedBadges] = useState<Badge[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ level: 1, xp: 0, totalHabitsCompleted: 0 });
+
+  useEffect(() => {
+    if (!userId) return;
+    
+    const loadData = async () => {
+      try {
+        const userStats = await userStatsService.getOrCreate(userId);
+        setEarnedBadges(userStats.badges || []);
+        setStats({
+          level: userStats.level,
+          xp: userStats.xp,
+          totalHabitsCompleted: userStats.totalHabitsCompleted,
+        });
+      } catch (error) {
+        console.error('Erro ao carregar conquistas:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [userId]);
+
+  const earnedIds = new Set(earnedBadges.map(b => b.id));
+  const categories = [...new Set(ALL_ACHIEVEMENTS.map(a => a.category))];
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6"
+    >
+      {/* Header */}
+      <motion.div variants={itemVariants}>
+        <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
+          Conquistas
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Suas medalhas e conquistas desbloqueadas
+        </p>
+      </motion.div>
+
+      {/* Stats Overview */}
+      <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="p-4 text-center">
+          <div className="text-3xl font-bold text-primary">{earnedBadges.length}</div>
+          <p className="text-sm text-muted-foreground">Conquistadas</p>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-3xl font-bold text-muted-foreground">{ALL_ACHIEVEMENTS.length - earnedBadges.length}</div>
+          <p className="text-sm text-muted-foreground">Restantes</p>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-3xl font-bold text-amber-500">{stats.level}</div>
+          <p className="text-sm text-muted-foreground">Nível</p>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-3xl font-bold text-purple-500">{stats.totalHabitsCompleted}</div>
+          <p className="text-sm text-muted-foreground">Hábitos</p>
+        </Card>
+      </motion.div>
+
+      {/* Achievements by Category */}
+      {categories.map((category) => {
+        const categoryAchievements = ALL_ACHIEVEMENTS.filter(a => a.category === category);
+        const earnedInCategory = categoryAchievements.filter(a => earnedIds.has(a.id)).length;
+
+        return (
+          <motion.div key={category} variants={itemVariants}>
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center text-white",
+                      categoryColors[category]
+                    )}>
+                      {categoryIcons[category]}
+                    </div>
+                    <CardTitle className="text-lg">{category}</CardTitle>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {earnedInCategory}/{categoryAchievements.length}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {categoryAchievements.map((achievement) => {
+                    const isEarned = earnedIds.has(achievement.id);
+                    const earnedBadge = earnedBadges.find(b => b.id === achievement.id);
+
+                    return (
+                      <motion.div
+                        key={achievement.id}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={cn(
+                          "relative p-4 rounded-xl border text-center transition-all cursor-pointer",
+                          isEarned
+                            ? "bg-gradient-to-br from-amber-500/10 to-orange-500/10 border-amber-500/30"
+                            : "bg-muted/30 border-muted opacity-50 grayscale"
+                        )}
+                      >
+                        <div className="text-3xl mb-2">{achievement.icon}</div>
+                        <p className={cn(
+                          "text-xs font-medium line-clamp-2",
+                          isEarned ? "text-foreground" : "text-muted-foreground"
+                        )}>
+                          {achievement.name}
+                        </p>
+                        {isEarned && earnedBadge && (
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {new Date(earnedBadge.earnedDate).toLocaleDateString('pt-BR')}
+                          </p>
+                        )}
+                        {!isEarned && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-xl">
+                            <span className="text-2xl">🔒</span>
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        );
+      })}
+    </motion.div>
+  );
+}

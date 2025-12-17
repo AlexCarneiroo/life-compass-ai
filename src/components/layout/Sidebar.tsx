@@ -18,7 +18,9 @@ import {
   ChevronRight,
   Sparkles,
   Settings,
-  Wrench
+  Wrench,
+  Trophy,
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -40,8 +42,9 @@ const menuItems = [
   // { id: 'work', icon: Briefcase, label: 'Vida Profissional', color: 'text-slate-500', activeBg: 'bg-slate-500' }, // Arquivado
   { id: 'ai', icon: Brain, label: 'IA Coach', color: 'text-violet-500', activeBg: 'bg-violet-500' },
   { id: 'reports', icon: BarChart3, label: 'Relatórios', color: 'text-teal-500', activeBg: 'bg-teal-500' },
-/*   { id: 'tools', icon: Wrench, label: 'Ferramentas', color: 'text-amber-500', activeBg: 'bg-amber-500' },
- */];
+  { id: 'achievements', icon: Trophy, label: 'Conquistas', color: 'text-amber-500', activeBg: 'bg-amber-500' },
+  { id: 'social', icon: Users, label: 'Comunidade', color: 'text-sky-500', activeBg: 'bg-sky-500' },
+];
 
 export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);

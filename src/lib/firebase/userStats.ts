@@ -293,6 +293,53 @@ export const userStatsService = {
     });
   },
 
+  // Calcular e atualizar streak baseado nos check-ins
+  async calculateAndUpdateStreak(userId: string, checkIns: { date: string }[]): Promise<number> {
+    if (!checkIns || checkIns.length === 0) {
+      await this.updateStreak(userId, 0);
+      return 0;
+    }
+
+    // Ordena check-ins por data (mais recente primeiro)
+    const sortedDates = checkIns
+      .map(c => c.date)
+      .sort((a, b) => b.localeCompare(a));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    // Verifica se fez check-in hoje ou ontem
+    const lastCheckInDate = sortedDates[0];
+    if (lastCheckInDate !== todayStr && lastCheckInDate !== yesterdayStr) {
+      // Quebrou a sequência
+      await this.updateStreak(userId, 0);
+      return 0;
+    }
+
+    // Conta dias consecutivos
+    let streak = 0;
+    let currentDate = lastCheckInDate === todayStr ? today : yesterday;
+    const dateSet = new Set(sortedDates);
+
+    while (true) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      if (dateSet.has(dateStr)) {
+        streak++;
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    await this.updateStreak(userId, streak);
+    return streak;
+  },
+
   // Incrementar check-ins completados
   async incrementCheckInsCompleted(userId: string): Promise<void> {
     const statsRef = doc(db, COLLECTION, userId);

@@ -58,7 +58,6 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
       <SheetPrimitive.Content 
         ref={ref} 
         className={cn(sheetVariants({ side }), className)} 
-        onPointerDownOutside={(e) => e.preventDefault()}
         {...props}
       >
         {children}

@@ -112,7 +112,7 @@ export function WorkSection() {
               Novo Projeto
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Novo Projeto</DialogTitle>
             </DialogHeader>

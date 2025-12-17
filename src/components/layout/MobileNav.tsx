@@ -15,6 +15,7 @@ import {
   Brain,
   BarChart3,
   User,
+  Users,
   Settings,
   LogOut,
   Trophy,
@@ -59,8 +60,9 @@ const menuItems = [
   { id: 'journal', label: 'Diário', icon: BookOpen, color: 'text-rose-500', activeBg: 'bg-rose-500' },
   { id: 'ai', label: 'IA Coach', icon: Brain, color: 'text-violet-500', activeBg: 'bg-violet-500' },
   { id: 'reports', label: 'Relatórios', icon: BarChart3, color: 'text-teal-500', activeBg: 'bg-teal-500' },
-/*   { id: 'tools', label: 'Ferramentas', icon: Wrench, color: 'text-amber-500', activeBg: 'bg-amber-500' },
- */];
+  { id: 'achievements', label: 'Conquistas', icon: Trophy, color: 'text-amber-500', activeBg: 'bg-amber-500' },
+  { id: 'social', label: 'Comunidade', icon: Users, color: 'text-sky-500', activeBg: 'bg-sky-500' },
+];
 
 const quickNavItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Visão Geral', color: 'text-indigo-500', bgColor: 'bg-indigo-500/10', activeBg: 'bg-indigo-500', glow: 'shadow-indigo-500/30' },

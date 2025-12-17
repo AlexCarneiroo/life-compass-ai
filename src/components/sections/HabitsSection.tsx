@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
@@ -179,6 +179,34 @@ export function HabitsSection() {
     '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
     '#EC4899', '#06B6D4', '#F97316', '#84CC16', '#6366F1'
   ];
+
+  // Função para verificar e solicitar permissão de notificação
+  const handleReminderToggle = useCallback(async (checked: boolean) => {
+    if (checked) {
+      // Verifica se o navegador suporta notificações
+      if (!('Notification' in window)) {
+        toast.error('Seu navegador não suporta notificações');
+        return;
+      }
+
+      // Se não tem permissão, solicita
+      if (Notification.permission === 'denied') {
+        toast.error('Notificações bloqueadas. Ative nas configurações do navegador.');
+        return;
+      }
+
+      if (Notification.permission !== 'granted') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          toast.error('Permissão de notificação negada');
+          return;
+        }
+        toast.success('Notificações ativadas!');
+      }
+    }
+    
+    setFormData({ ...formData, reminderEnabled: checked });
+  }, [formData]);
 
   useEffect(() => {
     if (!userId) return;
@@ -493,7 +521,7 @@ export function HabitsSection() {
               Novo Hábito
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingHabit ? 'Editar Hábito' : 'Novo Hábito'}</DialogTitle>
             </DialogHeader>
@@ -618,7 +646,7 @@ export function HabitsSection() {
                   <Switch
                     id="reminderEnabled"
                     checked={formData.reminderEnabled}
-                    onCheckedChange={(checked) => setFormData({ ...formData, reminderEnabled: checked })}
+                    onCheckedChange={handleReminderToggle}
                   />
                 </div>
                 {formData.reminderEnabled && (

@@ -92,11 +92,15 @@ export function QuickCheckin() {
         await userStatsService.addXP(userId, 10);
         await userStatsService.incrementCheckInsCompleted(userId);
         
+        // Atualiza streak baseado nos check-ins
+        const allCheckIns = await checkinService.getAll(userId);
+        const newStreak = await userStatsService.calculateAndUpdateStreak(userId, allCheckIns);
+        
         // Verifica e concede badges
         const stats = await userStatsService.getOrCreate(userId);
         const newBadges = await checkAndGrantBadges(userId, {
           habitsCompleted: stats.totalHabitsCompleted || 0,
-          currentStreak: stats.currentStreak || 0,
+          currentStreak: newStreak,
           workoutsCompleted: stats.workoutsCompleted || 0,
           checkInsCompleted: (stats.checkInsCompleted || 0) + 1,
         });

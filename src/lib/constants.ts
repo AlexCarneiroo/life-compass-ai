@@ -10,3 +10,4 @@ export const expenseCategories = [
   { name: 'Saúde', icon: '💊', color: 'hsl(340, 70%, 55%)' },
   { name: 'Educação', icon: '📚', color: 'hsl(45, 90%, 50%)' },
 ];
+

@@ -122,3 +122,4 @@ class PushNotificationService {
 }
 
 export const pushNotificationService = new PushNotificationService();
+

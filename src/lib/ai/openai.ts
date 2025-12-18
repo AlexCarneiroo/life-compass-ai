@@ -345,5 +345,3 @@ Responda em formato JSON:
 }
 
 export const aiService = new AIService();
-
-

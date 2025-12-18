@@ -487,3 +487,4 @@ export function SocialSection() {
     </motion.div>
   );
 }
+

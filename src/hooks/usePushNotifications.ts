@@ -7,6 +7,7 @@ import { checkinService } from '@/lib/firebase/checkin';
 import { userSettingsService } from '@/lib/firebase/userSettings';
 import { userStatsService } from '@/lib/firebase/userStats';
 import { logger } from '@/lib/utils/logger';
+import { initializeFCM, setupFCMForegroundListener } from '@/lib/firebase/messaging';
 
 interface ScheduledReminder {
   id: string;
@@ -67,6 +68,38 @@ export function usePushNotifications() {
     setIsSupported(pushNotificationService.isSupported());
     setHasPermission(pushNotificationService.hasPermission());
   }, []);
+
+  // Inicializa FCM quando tiver permissão e userId
+  useEffect(() => {
+    if (!hasPermission || !userId) return;
+
+    const initFCM = async () => {
+      try {
+        const token = await initializeFCM(userId);
+        if (token) {
+          logger.info('FCM inicializado com sucesso');
+          
+          // Configura listener para mensagens em foreground
+          setupFCMForegroundListener((payload) => {
+            logger.info('Mensagem FCM recebida em foreground:', payload);
+            // Pode mostrar notificação local ou atualizar UI
+            if (payload.notification) {
+              pushNotificationService.sendNotification({
+                title: payload.notification.title || 'LifeOS',
+                body: payload.notification.body || '',
+                tag: payload.data?.tag || 'fcm-notification',
+                data: payload.data,
+              });
+            }
+          });
+        }
+      } catch (error) {
+        logger.error('Erro ao inicializar FCM:', error);
+      }
+    };
+
+    initFCM();
+  }, [hasPermission, userId]);
 
   const requestPermission = useCallback(async () => {
     const granted = await pushNotificationService.requestPermission();
@@ -396,3 +429,4 @@ export function usePushNotifications() {
     scheduledReminders,
   };
 }
+

@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics } from 'firebase/analytics';
+import { getMessaging, Messaging } from 'firebase/messaging';
 
 // Configuração do Firebase
 const firebaseConfig = {
@@ -29,6 +30,16 @@ if (typeof window !== 'undefined') {
   analytics = getAnalytics(app);
 }
 
-export { analytics };
+// Initialize Firebase Cloud Messaging (only in browser)
+let messaging: Messaging | null = null;
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  try {
+    messaging = getMessaging(app);
+  } catch (error) {
+    console.warn('FCM não disponível:', error);
+  }
+}
+
+export { analytics, messaging };
 export default app;
 

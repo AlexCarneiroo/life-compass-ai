@@ -215,3 +215,4 @@ export function AchievementsSection() {
     </motion.div>
   );
 }
+

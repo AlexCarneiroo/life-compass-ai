@@ -115,3 +115,4 @@ export function usePullToRefresh({
     progress: Math.min(pullDistance / threshold, 1),
   };
 }
+

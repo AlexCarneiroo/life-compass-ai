@@ -8,27 +8,47 @@ import { Trophy, Star, Flame, Target, Zap, Award, Crown, Medal } from 'lucide-re
 import { cn } from '@/lib/utils';
 
 // Definição de todas as conquistas possíveis
+// IMPORTANTE: Os IDs devem corresponder aos IDs gerados por checkAndGrantBadges
 const ALL_ACHIEVEMENTS = [
-  { id: 'first_checkin', name: 'Primeiro Passo', description: 'Complete seu primeiro check-in', icon: '🎯', category: 'Início' },
-  { id: 'week_streak', name: 'Semana Perfeita', description: 'Complete 7 dias seguidos de check-in', icon: '🔥', category: 'Consistência' },
-  { id: 'month_streak', name: 'Mês de Ouro', description: 'Complete 30 dias seguidos de check-in', icon: '👑', category: 'Consistência' },
-  { id: 'first_habit', name: 'Construtor de Hábitos', description: 'Complete seu primeiro hábito', icon: '✅', category: 'Hábitos' },
-  { id: 'habit_master', name: 'Mestre dos Hábitos', description: 'Complete 100 hábitos no total', icon: '🏆', category: 'Hábitos' },
-  { id: 'habit_streak_7', name: 'Sequência de 7', description: 'Mantenha um hábito por 7 dias seguidos', icon: '⚡', category: 'Hábitos' },
-  { id: 'habit_streak_30', name: 'Sequência de 30', description: 'Mantenha um hábito por 30 dias seguidos', icon: '💪', category: 'Hábitos' },
-  { id: 'level_5', name: 'Nível 5', description: 'Alcance o nível 5', icon: '⭐', category: 'Progressão' },
-  { id: 'level_10', name: 'Nível 10', description: 'Alcance o nível 10', icon: '🌟', category: 'Progressão' },
-  { id: 'level_25', name: 'Veterano', description: 'Alcance o nível 25', icon: '🎖️', category: 'Progressão' },
-  { id: 'level_50', name: 'Lenda', description: 'Alcance o nível 50', icon: '👑', category: 'Progressão' },
-  { id: 'first_goal', name: 'Sonhador', description: 'Crie sua primeira meta', icon: '🎯', category: 'Metas' },
-  { id: 'goal_complete', name: 'Realizador', description: 'Complete uma meta', icon: '🏅', category: 'Metas' },
-  { id: 'workout_week', name: 'Atleta', description: 'Treine 7 dias em uma semana', icon: '🏋️', category: 'Saúde' },
-  { id: 'early_bird', name: 'Madrugador', description: 'Faça check-in antes das 7h', icon: '🌅', category: 'Especial' },
-  { id: 'night_owl', name: 'Coruja', description: 'Faça check-in após às 23h', icon: '🦉', category: 'Especial' },
-  { id: 'perfect_mood', name: 'Dia Perfeito', description: 'Registre humor máximo (6)', icon: '😊', category: 'Bem-estar' },
-  { id: 'hydration_master', name: 'Hidratado', description: 'Beba 3L de água em um dia', icon: '💧', category: 'Saúde' },
-  { id: 'sleep_champion', name: 'Dorminhoco', description: 'Durma 8h por 7 dias seguidos', icon: '😴', category: 'Saúde' },
-  { id: 'journal_writer', name: 'Escritor', description: 'Escreva 10 entradas no diário', icon: '📝', category: 'Diário' },
+  // Check-ins
+  { id: 'first-checkin', name: 'Primeiro Check-in', description: 'Fez seu primeiro check-in', icon: '✨', category: 'Início' },
+  { id: 'checkin-week', name: 'Check-in Semanal', description: 'Fez check-in por 7 dias', icon: '📅', category: 'Consistência' },
+  { id: 'checkin-month', name: 'Check-in Mensal', description: 'Fez check-in por 30 dias', icon: '📆', category: 'Consistência' },
+  { id: 'checkin-master', name: 'Mestre do Check-in', description: 'Fez check-in por 100 dias', icon: '🎯', category: 'Consistência' },
+  
+  // Hábitos
+  { id: 'first-step', name: 'Primeiro Passo', description: 'Completou seu primeiro hábito', icon: '👣', category: 'Hábitos' },
+  { id: 'habit-10', name: '10 Hábitos', description: 'Completou 10 hábitos', icon: '⭐', category: 'Hábitos' },
+  { id: 'habit-50', name: '50 Hábitos', description: 'Completou 50 hábitos', icon: '💫', category: 'Hábitos' },
+  { id: 'habit-master', name: 'Mestre dos Hábitos', description: 'Completou 100 hábitos', icon: '👑', category: 'Hábitos' },
+  
+  // Sequências (Streaks)
+  { id: 'streak-3', name: '3 Dias Consistente', description: 'Completou hábitos por 3 dias seguidos', icon: '🌱', category: 'Consistência' },
+  { id: 'streak-7', name: '7 Dias Consistente', description: 'Completou hábitos por 7 dias seguidos', icon: '🔥', category: 'Consistência' },
+  { id: 'streak-30', name: '30 Dias Consistente', description: 'Completou hábitos por 30 dias seguidos', icon: '💎', category: 'Consistência' },
+  { id: 'streak-100', name: '100 Dias Consistente', description: 'Completou hábitos por 100 dias seguidos', icon: '🌟', category: 'Consistência' },
+  
+  // Níveis (serão adicionados dinamicamente baseado no nível do usuário)
+  { id: 'level-5', name: 'Nível 5', description: 'Alcance o nível 5', icon: '⭐', category: 'Progressão' },
+  { id: 'level-10', name: 'Nível 10', description: 'Alcance o nível 10', icon: '🌟', category: 'Progressão' },
+  { id: 'level-25', name: 'Veterano', description: 'Alcance o nível 25', icon: '🎖️', category: 'Progressão' },
+  { id: 'level-50', name: 'Lenda', description: 'Alcance o nível 50', icon: '👑', category: 'Progressão' },
+  
+  // Treinos
+  { id: 'athlete', name: 'Atleta', description: 'Treinou 20 vezes', icon: '💪', category: 'Saúde' },
+  { id: 'athlete-advanced', name: 'Atleta Avançado', description: 'Treinou 50 vezes', icon: '🏆', category: 'Saúde' },
+  
+  // Metas (serão implementadas no futuro)
+  { id: 'first-goal', name: 'Sonhador', description: 'Crie sua primeira meta', icon: '🎯', category: 'Metas' },
+  { id: 'goal-complete', name: 'Realizador', description: 'Complete uma meta', icon: '🏅', category: 'Metas' },
+  
+  // Especiais (serão implementadas no futuro)
+  { id: 'early-bird', name: 'Madrugador', description: 'Faça check-in antes das 7h', icon: '🌅', category: 'Especial' },
+  { id: 'night-owl', name: 'Coruja', description: 'Faça check-in após às 23h', icon: '🦉', category: 'Especial' },
+  { id: 'perfect-mood', name: 'Dia Perfeito', description: 'Registre humor máximo (6)', icon: '😊', category: 'Bem-estar' },
+  { id: 'hydration-master', name: 'Hidratado', description: 'Beba 3L de água em um dia', icon: '💧', category: 'Saúde' },
+  { id: 'sleep-champion', name: 'Dorminhoco', description: 'Durma 8h por 7 dias seguidos', icon: '😴', category: 'Saúde' },
+  { id: 'journal-writer', name: 'Escritor', description: 'Escreva 10 entradas no diário', icon: '📝', category: 'Diário' },
 ];
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -67,7 +87,14 @@ export function AchievementsSection() {
     const loadData = async () => {
       try {
         const userStats = await userStatsService.getOrCreate(userId);
-        setEarnedBadges(userStats.badges || []);
+        const badges = userStats.badges || [];
+        
+        // Debug: log das conquistas ganhas
+        console.log('🏆 Conquistas carregadas do Firestore:', badges.length);
+        console.log('IDs das conquistas ganhas:', badges.map(b => b.id));
+        console.log('IDs das conquistas disponíveis:', ALL_ACHIEVEMENTS.map(a => a.id));
+        
+        setEarnedBadges(badges);
         setStats({
           level: userStats.level,
           xp: userStats.xp,
@@ -81,9 +108,20 @@ export function AchievementsSection() {
     };
 
     loadData();
+    
+    // Listener para atualizar quando stats mudarem
+    const handleStatsUpdate = () => {
+      loadData();
+    };
+    window.addEventListener('stats-updated', handleStatsUpdate);
+    
+    return () => {
+      window.removeEventListener('stats-updated', handleStatsUpdate);
+    };
   }, [userId]);
 
-  const earnedIds = new Set(earnedBadges.map(b => b.id));
+  // Cria um Set com os IDs das conquistas ganhas (normaliza para comparar)
+  const earnedIds = new Set(earnedBadges.map(b => b.id.toLowerCase().trim()));
   const categories = [...new Set(ALL_ACHIEVEMENTS.map(a => a.category))];
 
   const containerVariants = {
@@ -144,10 +182,65 @@ export function AchievementsSection() {
         </Card>
       </motion.div>
 
+      {/* Minhas Conquistas Ganhas */}
+      {earnedBadges.length > 0 && (
+        <motion.div variants={itemVariants}>
+          <Card className="border-2 border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-orange-500/10">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="w-6 h-6 text-amber-500" />
+                Minhas Conquistas ({earnedBadges.length})
+              </CardTitle>
+              <CardDescription>
+                Conquistas que você já desbloqueou
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {earnedBadges.map((badge) => {
+                  // Encontra a definição da conquista ou usa os dados do badge
+                  const normalizeId = (id: string) => id.toLowerCase().trim().replace(/[-_]/g, '');
+                  const achievementDef = ALL_ACHIEVEMENTS.find(a => 
+                    normalizeId(a.id) === normalizeId(badge.id)
+                  ) || {
+                    name: badge.name,
+                    icon: badge.icon,
+                    description: badge.description,
+                    category: 'Ganhas'
+                  };
+
+                  return (
+                    <motion.div
+                      key={badge.id}
+                      whileHover={{ scale: 1.05 }}
+                      className="flex flex-col items-center p-4 rounded-xl bg-background/50 border border-amber-500/30"
+                    >
+                      <div className="text-4xl mb-2">{achievementDef.icon || badge.icon}</div>
+                      <p className="text-xs font-semibold text-center line-clamp-2 mb-1">
+                        {achievementDef.name || badge.name}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground text-center">
+                        {new Date(badge.earnedDate).toLocaleDateString('pt-BR')}
+                      </p>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Achievements by Category */}
       {categories.map((category) => {
         const categoryAchievements = ALL_ACHIEVEMENTS.filter(a => a.category === category);
-        const earnedInCategory = categoryAchievements.filter(a => earnedIds.has(a.id)).length;
+        
+        // Normaliza IDs para contar conquistas ganhas
+        const normalizeId = (id: string) => id.toLowerCase().trim().replace(/[-_]/g, '');
+        const earnedInCategory = categoryAchievements.filter(a => {
+          const normalizedAchievementId = normalizeId(a.id);
+          return earnedBadges.some(b => normalizeId(b.id) === normalizedAchievementId);
+        }).length;
 
         return (
           <motion.div key={category} variants={itemVariants}>
@@ -171,8 +264,21 @@ export function AchievementsSection() {
               <CardContent>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                   {categoryAchievements.map((achievement) => {
-                    const isEarned = earnedIds.has(achievement.id);
-                    const earnedBadge = earnedBadges.find(b => b.id === achievement.id);
+                    // Normaliza IDs para comparação (remove diferenças de formato)
+                    const normalizeId = (id: string) => id.toLowerCase().trim().replace(/[-_]/g, '');
+                    const normalizedAchievementId = normalizeId(achievement.id);
+                    
+                    // Verifica se a conquista foi ganha
+                    const isEarned = earnedBadges.some(b => {
+                      const normalizedBadgeId = normalizeId(b.id);
+                      return normalizedBadgeId === normalizedAchievementId;
+                    });
+                    
+                    // Encontra a conquista ganha correspondente
+                    const earnedBadge = earnedBadges.find(b => {
+                      const normalizedBadgeId = normalizeId(b.id);
+                      return normalizedBadgeId === normalizedAchievementId;
+                    });
 
                     return (
                       <motion.div

@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { checkinService } from '@/lib/firebase/checkin';
 import { userStatsService, checkAndGrantBadges } from '@/lib/firebase/userStats';
+import { workoutsService } from '@/lib/firebase/workouts';
 import { DailyCheckIn } from '@/types';
 import { offlineCheckinService } from '@/lib/services/offlineCheckin';
 import { logger } from '@/lib/utils/logger';
@@ -196,8 +197,37 @@ export function CheckinSection() {
       if (currentCheckin) {
         // Sempre atualiza se já existe
         await checkinService.update(currentCheckin.id, checkinData);
+        
+        // Se treinou e não tinha treino registrado hoje, cria
+        if (workout) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const todayWorkouts = await workoutsService.getByDateRange(userId, todayStr, todayStr);
+          
+          if (todayWorkouts.length === 0) {
+            try {
+              await workoutsService.create({
+                modality: 'outro',
+                duration: 30,
+                intensity: 'medium',
+                date: todayStr,
+                notes: 'Treino registrado via check-in',
+              }, userId);
+              
+              await userStatsService.incrementWorkoutsCompleted(userId);
+              
+              // Atualiza desafios
+              const userChallenges = await workoutsService.getChallengesByParticipant(userId);
+              for (const challenge of userChallenges) {
+                await workoutsService.updateParticipantStreak(challenge.id, userId);
+              }
+            } catch (error) {
+              console.error('Erro ao criar treino do check-in:', error);
+            }
+          }
+        }
+        
         toast.success('Check-in atualizado com sucesso!', {
-          description: 'Seu progresso foi atualizado.'
+          description: workout ? 'Treino registrado automaticamente!' : 'Seu progresso foi atualizado.'
         });
         
         // Aguarda um pouco para garantir que o Firebase processou
@@ -212,6 +242,31 @@ export function CheckinSection() {
       } else {
         // Só cria se não existe
         await checkinService.create(checkinData, userId);
+        // Se treinou, cria treino automaticamente
+        if (workout) {
+          try {
+            await workoutsService.create({
+              modality: 'outro', // Modalidade padrão, usuário pode editar depois
+              duration: 30, // Duração padrão
+              intensity: 'medium',
+              date: todayStr,
+              notes: 'Treino registrado via check-in',
+            }, userId);
+            
+            // Atualiza stats
+            await userStatsService.incrementWorkoutsCompleted(userId);
+            
+            // Atualiza desafios do usuário
+            const userChallenges = await workoutsService.getChallengesByParticipant(userId);
+            for (const challenge of userChallenges) {
+              await workoutsService.updateParticipantStreak(challenge.id, userId);
+            }
+          } catch (error) {
+            console.error('Erro ao criar treino do check-in:', error);
+            // Não bloqueia o check-in se falhar
+          }
+        }
+        
         // Adiciona XP por fazer check-in completo (só na primeira vez)
         await userStatsService.addXP(userId, 50);
         await userStatsService.incrementCheckInsCompleted(userId);
@@ -238,7 +293,7 @@ export function CheckinSection() {
         }
         
         toast.success('Check-in salvo com sucesso!', {
-          description: 'Seu progresso foi registrado. Continue assim!'
+          description: workout ? 'Treino registrado automaticamente!' : 'Seu progresso foi registrado. Continue assim!'
         });
         
         // Aguarda um pouco para garantir que o Firebase processou

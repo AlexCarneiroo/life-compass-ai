@@ -348,42 +348,56 @@ export const socialService = {
   },
 
   async getFeed(userId: string, limitCount: number = 20): Promise<(SocialPost & { profile: PublicProfile })[]> {
-    // Busca simples sem índice - ordena localmente
-    const q = query(
-      collection(db, POSTS_COLLECTION),
-      limit(100)
-    );
-    
-    const snapshot = await getDocs(q);
-    let allPosts = snapshot.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      createdAt: d.data().createdAt?.toDate(),
-    } as SocialPost));
-    
-    // Busca conexões para filtrar
-    const connections = await this.getConnections(userId);
-    const friendIds = connections.map(c => 
-      c.connection.fromUserId === userId ? c.connection.toUserId : c.connection.fromUserId
-    );
-    friendIds.push(userId);
-    
-    // Filtra posts de amigos e próprio
-    allPosts = allPosts.filter(p => friendIds.includes(p.oderId));
-    
-    // Ordena localmente
-    allPosts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    const limitedPosts = allPosts.slice(0, limitCount);
-    
-    const results: (SocialPost & { profile: PublicProfile })[] = [];
-    for (const post of limitedPosts) {
-      const profile = await this.getProfile(post.oderId);
-      if (profile) {
-        results.push({ ...post, profile });
-      }
+    try {
+      // Busca conexões primeiro (cacheável)
+      const connections = await this.getConnections(userId);
+      const friendIds = connections.map(c => 
+        c.connection.fromUserId === userId ? c.connection.toUserId : c.connection.fromUserId
+      );
+      friendIds.push(userId);
+      
+      // Limita busca inicial para melhor performance (50 em vez de 100)
+      // Nota: orderBy requer índice composto no Firestore
+      const q = query(
+        collection(db, POSTS_COLLECTION),
+        limit(50)
+      );
+      
+      const snapshot = await getDocs(q);
+      let allPosts = snapshot.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        createdAt: d.data().createdAt?.toDate(),
+      } as SocialPost));
+      
+      // Filtra posts de amigos e próprio
+      allPosts = allPosts.filter(p => friendIds.includes(p.oderId));
+      
+      // Ordena localmente por data (mais recente primeiro)
+      allPosts.sort((a, b) => {
+        const aTime = a.createdAt?.getTime() || 0;
+        const bTime = b.createdAt?.getTime() || 0;
+        return bTime - aTime;
+      });
+      
+      // Limita antes de buscar perfis (reduz queries)
+      const limitedPosts = allPosts.slice(0, limitCount);
+      
+      // Busca perfis em paralelo (mais eficiente)
+      const profilePromises = limitedPosts.map(post => 
+        this.getProfile(post.oderId).then(profile => ({ post, profile }))
+      );
+      
+      const resultsWithProfiles = await Promise.all(profilePromises);
+      
+      // Filtra apenas posts com perfil válido
+      return resultsWithProfiles
+        .filter(({ profile }) => profile !== null)
+        .map(({ post, profile }) => ({ ...post, profile: profile! }));
+    } catch (error) {
+      logger.error('Erro ao buscar feed:', error);
+      return [];
     }
-    
-    return results;
   },
 
   async likePost(postId: string, oderId: string): Promise<void> {

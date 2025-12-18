@@ -18,6 +18,7 @@ const HabitsSection = lazy(() => import('@/components/sections/HabitsSection').t
 const CheckinSection = lazy(() => import('@/components/sections/CheckinSection').then(m => ({ default: m.CheckinSection })));
 const FinanceSection = lazy(() => import('@/components/sections/FinanceSection').then(m => ({ default: m.FinanceSection })));
 const HealthSection = lazy(() => import('@/components/sections/HealthSection').then(m => ({ default: m.HealthSection })));
+const WorkoutSection = lazy(() => import('@/components/sections/WorkoutSection').then(m => ({ default: m.WorkoutSection })));
 const RoutinesSection = lazy(() => import('@/components/sections/RoutinesSection').then(m => ({ default: m.RoutinesSection })));
 const GoalsSection = lazy(() => import('@/components/sections/GoalsSection').then(m => ({ default: m.GoalsSection })));
 const JournalSection = lazy(() => import('@/components/sections/JournalSection').then(m => ({ default: m.JournalSection })));
@@ -78,8 +79,8 @@ const Index = () => {
 
   const { pullDistance, isRefreshing, progress, willRefresh } = usePullToRefresh({
     onRefresh: handleRefresh,
-    threshold: 100,
-    cancelThreshold: 40,
+    threshold: 60, // Reduzido para ser mais sensível
+    cancelThreshold: 30, // Reduzido também
   });
 
   // Carregar seções protegidas
@@ -214,6 +215,12 @@ const Index = () => {
             <GoalsSection />
           </Suspense>
         );
+      case 'workout':
+        return (
+          <Suspense fallback={<SectionSkeleton />}>
+            <WorkoutSection />
+          </Suspense>
+        );
       case 'health':
         return (
           <Suspense fallback={<SectionSkeleton />}>
@@ -282,8 +289,8 @@ const Index = () => {
         <div 
           className="lg:hidden fixed top-14 left-0 right-0 z-40 flex flex-col items-center pointer-events-none"
           style={{ 
-            transform: `translateY(${Math.max(0, pullDistance - 30)}px)`,
-            opacity: Math.min(progress * 1.5, 1),
+            transform: `translateY(${Math.max(0, pullDistance - 20)}px)`,
+            opacity: Math.min(progress * 2, 1), // Mais visível mais cedo
           }}
         >
           <div className={cn(

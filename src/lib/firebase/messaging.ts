@@ -30,6 +30,7 @@ export async function getFCMToken(): Promise<string | null> {
     }
 
     // Obtém o token FCM
+    // O Firebase Messaging automaticamente procura por firebase-messaging-sw.js na raiz
     const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
     });

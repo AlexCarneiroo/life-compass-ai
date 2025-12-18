@@ -279,6 +279,19 @@ export const userStatsService = {
         badges: [...currentStats.badges, badge],
         updatedAt: Timestamp.now(),
       });
+      
+      // Compartilha a conquista no feed da comunidade
+      try {
+        const { socialService } = await import('./social');
+        await socialService.shareAchievement(userId, {
+          id: badge.id,
+          name: badge.name,
+          icon: badge.icon,
+        });
+      } catch (error) {
+        // Se falhar ao compartilhar, não quebra o fluxo
+        console.warn('Erro ao compartilhar conquista no feed:', error);
+      }
     }
   },
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, memo, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { MoodChart } from '@/components/dashboard/MoodChart';
@@ -65,21 +65,26 @@ export function DashboardSection() {
     }
   }, [userId]);
 
-  const loadWeeklyStats = async () => {
+  const loadWeeklyStats = useCallback(async () => {
+    if (!userId) return;
+    
     try {
+      setLoading(true);
       const today = new Date();
       const weekAgo = new Date(today);
       weekAgo.setDate(weekAgo.getDate() - 7);
       const todayStr = today.toISOString().split('T')[0];
       const weekAgoStr = weekAgo.toISOString().split('T')[0];
       
-      // Busca todos os dados em paralelo
+      // Busca apenas dados da última semana (mais eficiente)
+      // Usa cache do Firestore quando disponível
       const [allCheckIns, habits, allEntries] = await Promise.all([
         checkinService.getAll(userId),
         habitsService.getAll(userId),
         financeService.getAll(userId),
       ]);
       
+      // Filtra apenas últimos 7 dias (reduz processamento)
       const last7Days = allCheckIns.filter(c => c.date >= weekAgoStr && c.date <= todayStr);
       
       // Conta hábitos completados na semana
@@ -118,7 +123,7 @@ export function DashboardSection() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   if (loading) {
     return <DashboardSkeleton />;

@@ -26,7 +26,8 @@ import {
   Info,
   Wrench,
   UserPlus,
-  Zap
+  Zap,
+  Activity
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -57,6 +58,7 @@ const menuItems = [
   { id: 'habits', label: 'Hábitos', icon: Target, color: 'text-purple-500', activeBg: 'bg-purple-500' },
   { id: 'finance', label: 'Financeiro', icon: Wallet, color: 'text-blue-500', activeBg: 'bg-blue-500' },
   { id: 'goals', label: 'Metas & Objetivos', icon: Sparkles, color: 'text-yellow-500', activeBg: 'bg-yellow-500' },
+  { id: 'workout', label: 'Treino', icon: Activity, color: 'text-red-500', activeBg: 'bg-red-500' },
   { id: 'health', label: 'Saúde', icon: Dumbbell, color: 'text-orange-500', activeBg: 'bg-orange-500' },
   { id: 'routines', label: 'Rotinas', icon: Clock, color: 'text-cyan-500', activeBg: 'bg-cyan-500' },
   { id: 'journal', label: 'Diário', icon: BookOpen, color: 'text-rose-500', activeBg: 'bg-rose-500' },

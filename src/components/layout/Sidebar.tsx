@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { 
@@ -16,7 +16,8 @@ import {
   Sparkles,
   Settings,
   Trophy,
-  Users
+  Users,
+  Activity
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -31,6 +32,7 @@ const menuItems = [
   { id: 'habits', icon: Target, label: 'Hábitos', color: 'text-purple-500', activeBg: 'bg-purple-500' },
   { id: 'finance', icon: Wallet, label: 'Financeiro', color: 'text-blue-500', activeBg: 'bg-blue-500' },
   { id: 'goals', icon: Sparkles, label: 'Metas & Objetivos', color: 'text-yellow-500', activeBg: 'bg-yellow-500' },
+  { id: 'workout', icon: Activity, label: 'Treino', color: 'text-red-500', activeBg: 'bg-red-500' },
   { id: 'health', icon: Dumbbell, label: 'Saúde', color: 'text-orange-500', activeBg: 'bg-orange-500' },
   { id: 'routines', icon: Clock, label: 'Rotinas', color: 'text-cyan-500', activeBg: 'bg-cyan-500' },
   { id: 'journal', icon: BookOpen, label: 'Diário', color: 'text-rose-500', activeBg: 'bg-rose-500' },
@@ -40,7 +42,7 @@ const menuItems = [
   { id: 'social', icon: Users, label: 'Comunidade', color: 'text-sky-500', activeBg: 'bg-sky-500' },
 ];
 
-export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -163,4 +165,4 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
       </motion.div>
     </motion.aside>
   );
-}
+});

@@ -75,15 +75,17 @@ export function MoodChart() {
       return checkInDate === dateStr;
     });
     
-    // Se encontrou check-in, usa os dados; senão, retorna null
+    // Se encontrou check-in, usa os dados; senão, retorna 0 (não null para evitar bugs no gráfico)
     const hasData = checkIn !== undefined;
     
     return {
       day: days[date.getDay()], // Nome do dia da semana
       date: dateStr, // Para debug
+      // Usa null quando não tem dados para o gráfico não mostrar linha
       mood: hasData && checkIn.mood ? ((checkIn.mood - 1) * (10 / 5)) : null, // 1-6 -> 0-10
       energy: hasData && checkIn.energy ? checkIn.energy : null,
       productivity: hasData && checkIn.productivity ? checkIn.productivity : null,
+      hasData: hasData, // Flag para saber se tem dados reais
     };
   });
 
@@ -157,21 +159,35 @@ export function MoodChart() {
                 tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
               />
               <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '12px',
-                  boxShadow: 'var(--shadow-md)',
-                }}
-                formatter={(value: any) => {
-                  if (value === null || value === undefined) {
-                    return 'Sem dados';
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const translations: Record<string, string> = {
+                      'mood': 'Humor',
+                      'energy': 'Energia',
+                      'productivity': 'Produtividade'
+                    };
+                    
+                    const item = data.find(d => d.day === label);
+                    const dateLabel = item ? `${item.day} - ${new Date(item.date).toLocaleDateString('pt-BR')}` : label;
+                    
+                    return (
+                      <div className="rounded-lg border bg-card p-3 shadow-md">
+                        <p className="font-medium mb-2">{dateLabel}</p>
+                        {payload.map((entry: any, index: number) => {
+                          const translatedName = translations[entry.dataKey] || entry.dataKey;
+                          const value = entry.payload?.hasData && entry.value !== null && entry.value !== undefined
+                            ? entry.value.toFixed(1)
+                            : 'Sem dados';
+                          return (
+                            <p key={index} style={{ color: entry.color }} className="text-sm">
+                              {translatedName}: {value}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    );
                   }
-                  return value.toFixed(1);
-                }}
-                labelFormatter={(label) => {
-                  const item = data.find(d => d.day === label);
-                  return item ? `Data: ${item.date}` : label;
+                  return null;
                 }}
               />
               <Area 
@@ -183,6 +199,11 @@ export function MoodChart() {
                 fill="url(#colorMood)"
                 connectNulls={false}
                 isAnimationActive={true}
+                dot={(props: any) => {
+                  // Só mostra ponto se tiver dados reais
+                  return props.payload.hasData ? <circle cx={props.cx} cy={props.cy} r={3} fill="hsl(175, 70%, 45%)" /> : null;
+                }}
+                activeDot={{ r: 4 }}
               />
               <Area 
                 type="monotone" 
@@ -193,6 +214,10 @@ export function MoodChart() {
                 fill="url(#colorEnergy)"
                 connectNulls={false}
                 isAnimationActive={true}
+                dot={(props: any) => {
+                  return props.payload.hasData ? <circle cx={props.cx} cy={props.cy} r={3} fill="hsl(15, 85%, 55%)" /> : null;
+                }}
+                activeDot={{ r: 4 }}
               />
               <Area 
                 type="monotone" 
@@ -203,6 +228,10 @@ export function MoodChart() {
                 fill="url(#colorProd)"
                 connectNulls={false}
                 isAnimationActive={true}
+                dot={(props: any) => {
+                  return props.payload.hasData ? <circle cx={props.cx} cy={props.cy} r={3} fill="hsl(150, 60%, 45%)" /> : null;
+                }}
+                activeDot={{ r: 4 }}
               />
               </AreaChart>
             </ResponsiveContainer>

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Search, User, Moon, Sun, Settings, LogOut, Trophy, Award, Check, X, AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { Bell, Search, User, Moon, Sun, Settings, LogOut, Trophy, Award, Check, X, AlertCircle, CheckCircle, Info, UserPlus, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { auth } from '@/lib/firebase';
@@ -50,7 +50,19 @@ export function Header({ onSectionChange }: HeaderProps) {
   const [isBadgesModalOpen, setIsBadgesModalOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
+  const loadStats = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const userStats = await userStatsService.getOrCreate(userId);
+      setStats(userStats);
+    } catch (error) {
+      console.error('Erro ao carregar stats:', error);
+    }
+  }, [userId]);
+
   useEffect(() => {
+    if (!userId) return;
+    
     loadStats();
     // Listener para atualizar quando ganhar XP ou badge
     const handleStatsUpdate = () => {
@@ -74,18 +86,9 @@ export function Header({ onSectionChange }: HeaderProps) {
       window.removeEventListener('stats-updated', handleStatsUpdate);
       window.removeEventListener('user-profile-updated', handleProfileUpdate);
     };
-  }, [userId]);
+  }, [userId, loadStats]);
 
-  const loadStats = async () => {
-    try {
-      const userStats = await userStatsService.getOrCreate(userId);
-      setStats(userStats);
-    } catch (error) {
-      console.error('Erro ao carregar stats:', error);
-    }
-  };
-
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await logout();
       setIsProfileOpen(false);
@@ -93,15 +96,18 @@ export function Header({ onSectionChange }: HeaderProps) {
     } catch (error) {
       // Erro já é tratado no authService
     }
-  };
+  }, [logout, navigate]);
 
-  const today = new Date();
-  const options: Intl.DateTimeFormatOptions = { 
-    weekday: 'long', 
-    day: 'numeric', 
-    month: 'long' 
-  };
-  const formattedDate = today.toLocaleDateString('pt-BR', options);
+  // Memoiza a data formatada (só muda uma vez por dia)
+  const formattedDate = useMemo(() => {
+    const today = new Date();
+    const options: Intl.DateTimeFormatOptions = { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long' 
+    };
+    return today.toLocaleDateString('pt-BR', options);
+  }, []); // Só recalcula quando o componente monta
 
   return (
     <motion.header 
@@ -241,17 +247,23 @@ export function Header({ onSectionChange }: HeaderProps) {
                 ) : (
                   <div className="divide-y divide-border/50">
                     {notifications.map((notification) => {
-                      const Icon = notification.type === 'negative' 
-                        ? AlertCircle 
-                        : notification.type === 'positive'
-                        ? CheckCircle
-                        : Info;
+                      // Mapeia tipos de notificação para ícones
+                      const getIcon = () => {
+                        switch (notification.type) {
+                          case 'friend_request': return UserPlus;
+                          case 'friend_accepted': return CheckCircle;
+                          case 'achievement': return Trophy;
+                          case 'level_up': return Zap;
+                          default: return Info;
+                        }
+                      };
+                      const Icon = getIcon();
                       
-                      const iconColor = notification.type === 'negative'
-                        ? 'text-red-500'
-                        : notification.type === 'positive'
+                      const iconColor = ['friend_accepted', 'achievement', 'level_up'].includes(notification.type)
                         ? 'text-green-500'
-                        : 'text-blue-500';
+                        : notification.type === 'friend_request'
+                        ? 'text-blue-500'
+                        : 'text-muted-foreground';
 
                       return (
                         <div

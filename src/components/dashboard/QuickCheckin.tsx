@@ -26,6 +26,19 @@ export function QuickCheckin() {
     loadTodayCheckin();
   }, [userId]);
 
+  // Listener para detectar mudança de dia e resetar
+  useEffect(() => {
+    const handleDayChange = () => {
+      // Quando o dia muda, recarrega o check-in (que deve estar vazio para o novo dia)
+      loadTodayCheckin();
+    };
+
+    window.addEventListener('day-changed', handleDayChange);
+    return () => {
+      window.removeEventListener('day-changed', handleDayChange);
+    };
+  }, []);
+
   const loadTodayCheckin = async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -44,6 +57,14 @@ export function QuickCheckin() {
         }
         setSleep(checkin.sleepHours);
         setWorkout(checkin.workout);
+      } else {
+        // Se não há check-in, reseta os campos para valores padrão
+        setExistingCheckin(null);
+        setMood(null);
+        setEnergy(5);
+        setWater(1.5);
+        setSleep(7);
+        setWorkout(false);
       }
     } catch (error) {
       console.error('Erro ao carregar check-in:', error);

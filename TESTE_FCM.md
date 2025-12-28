@@ -144,3 +144,4 @@ No console do navegador, você deve ver:
 - `Token FCM salvo no Firestore`
 
 Se ver algum erro, anote a mensagem e verifique a documentação em `FCM_SETUP.md`.
+

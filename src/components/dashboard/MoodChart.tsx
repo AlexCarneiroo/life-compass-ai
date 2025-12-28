@@ -20,8 +20,15 @@ export function MoodChart() {
     };
     window.addEventListener('checkin-saved', handleCheckinSaved);
     
+    // Listener para detectar mudança de dia e recarregar
+    const handleDayChange = () => {
+      loadCheckIns();
+    };
+    window.addEventListener('day-changed', handleDayChange);
+    
     return () => {
       window.removeEventListener('checkin-saved', handleCheckinSaved);
+      window.removeEventListener('day-changed', handleDayChange);
     };
   }, [userId]);
 
@@ -75,19 +82,22 @@ export function MoodChart() {
       return checkInDate === dateStr;
     });
     
-    // Se encontrou check-in, usa os dados; senão, retorna 0 (não null para evitar bugs no gráfico)
+    // Se encontrou check-in, usa os dados; senão, retorna null
     const hasData = checkIn !== undefined;
     
     return {
       day: days[date.getDay()], // Nome do dia da semana
       date: dateStr, // Para debug
-      // Usa null quando não tem dados para o gráfico não mostrar linha
-      mood: hasData && checkIn.mood ? ((checkIn.mood - 1) * (10 / 5)) : null, // 1-6 -> 0-10
-      energy: hasData && checkIn.energy ? checkIn.energy : null,
-      productivity: hasData && checkIn.productivity ? checkIn.productivity : null,
+      // Usa 0 quando não tem dados para a linha "cair"
+      mood: hasData && checkIn.mood ? ((checkIn.mood - 1) * (10 / 5)) : 0, // 1-6 -> 0-10
+      energy: hasData && checkIn.energy ? checkIn.energy : 0,
+      productivity: hasData && checkIn.productivity ? checkIn.productivity : 0,
       hasData: hasData, // Flag para saber se tem dados reais
     };
   });
+  
+  // Verifica se há pelo menos um dado válido para mostrar o gráfico
+  const hasAnyData = data.some(d => d.hasData);
 
   const moods = checkIns.map(c => c.mood).filter(m => m > 0);
   const averageMood = moods.length > 0 
@@ -122,7 +132,7 @@ export function MoodChart() {
           <div className="h-64 sm:h-80 flex items-center justify-center">
             <p className="text-muted-foreground">Carregando dados...</p>
           </div>
-        ) : checkIns.length === 0 ? (
+        ) : !hasAnyData ? (
           <div className="h-64 sm:h-80 flex flex-col items-center justify-center gap-2">
             <p className="text-muted-foreground">Nenhum dado ainda</p>
             <p className="text-sm text-muted-foreground">Faça um check-in para ver sua evolução</p>
@@ -175,7 +185,8 @@ export function MoodChart() {
                         <p className="font-medium mb-2">{dateLabel}</p>
                         {payload.map((entry: any, index: number) => {
                           const translatedName = translations[entry.dataKey] || entry.dataKey;
-                          const value = entry.payload?.hasData && entry.value !== null && entry.value !== undefined
+                          const hasValue = entry.payload?.hasData;
+                          const value = hasValue
                             ? entry.value.toFixed(1)
                             : 'Sem dados';
                           return (
@@ -198,10 +209,13 @@ export function MoodChart() {
                 fillOpacity={0.6} 
                 fill="url(#colorMood)"
                 connectNulls={false}
-                isAnimationActive={true}
+                isAnimationActive={hasAnyData}
                 dot={(props: any) => {
-                  // Só mostra ponto se tiver dados reais
-                  return props.payload.hasData ? <circle cx={props.cx} cy={props.cy} r={3} fill="hsl(175, 70%, 45%)" /> : null;
+                  // Só mostra ponto se tiver dados reais (não mostra quando caiu para 0)
+                  if (!props.payload?.hasData) {
+                    return null;
+                  }
+                  return <circle cx={props.cx} cy={props.cy} r={3} fill="hsl(175, 70%, 45%)" />;
                 }}
                 activeDot={{ r: 4 }}
               />
@@ -213,9 +227,13 @@ export function MoodChart() {
                 fillOpacity={0.6} 
                 fill="url(#colorEnergy)"
                 connectNulls={false}
-                isAnimationActive={true}
+                isAnimationActive={hasAnyData}
                 dot={(props: any) => {
-                  return props.payload.hasData ? <circle cx={props.cx} cy={props.cy} r={3} fill="hsl(15, 85%, 55%)" /> : null;
+                  // Só mostra ponto se tiver dados reais (não mostra quando caiu para 0)
+                  if (!props.payload?.hasData) {
+                    return null;
+                  }
+                  return <circle cx={props.cx} cy={props.cy} r={3} fill="hsl(15, 85%, 55%)" />;
                 }}
                 activeDot={{ r: 4 }}
               />
@@ -227,9 +245,13 @@ export function MoodChart() {
                 fillOpacity={0.6} 
                 fill="url(#colorProd)"
                 connectNulls={false}
-                isAnimationActive={true}
+                isAnimationActive={hasAnyData}
                 dot={(props: any) => {
-                  return props.payload.hasData ? <circle cx={props.cx} cy={props.cy} r={3} fill="hsl(150, 60%, 45%)" /> : null;
+                  // Só mostra ponto se tiver dados reais (não mostra quando caiu para 0)
+                  if (!props.payload?.hasData) {
+                    return null;
+                  }
+                  return <circle cx={props.cx} cy={props.cy} r={3} fill="hsl(150, 60%, 45%)" />;
                 }}
                 activeDot={{ r: 4 }}
               />
@@ -237,7 +259,7 @@ export function MoodChart() {
             </ResponsiveContainer>
           </div>
         )}
-        {!loading && checkIns.length > 0 && (
+        {!loading && hasAnyData && (
           <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <span>Humor médio:</span>
           <span className="text-2xl">

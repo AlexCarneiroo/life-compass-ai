@@ -11,3 +11,4 @@ export const expenseCategories = [
   { name: 'Educação', icon: '📚', color: 'hsl(45, 90%, 50%)' },
 ];
 
+

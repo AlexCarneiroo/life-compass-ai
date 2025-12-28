@@ -213,52 +213,14 @@ export function HabitsSection() {
     
     loadHabits();
     
-    // Verifica a mudança de dia a cada minuto
-    const dayCheckInterval = setInterval(() => {
-      const today = new Date().toISOString().split('T')[0];
-      const lastCheckDate = localStorage.getItem('lastHabitCheckDate');
-      if (lastCheckDate !== today) {
-        localStorage.setItem('lastHabitCheckDate', today);
-        loadHabits();
-      }
-    }, 60000); // Verifica a cada minuto
-    
-    // Verifica imediatamente se o dia mudou
-    const today = new Date().toISOString().split('T')[0];
-    const lastCheckDate = localStorage.getItem('lastHabitCheckDate');
-    if (lastCheckDate !== today) {
-      localStorage.setItem('lastHabitCheckDate', today);
+    // Listener para detectar mudança de dia e recarregar hábitos
+    const handleDayChange = () => {
       loadHabits();
-    }
-    
-    // Também verifica quando a página ganha foco (usuário volta ao app)
-    const handleFocus = () => {
-      const today = new Date().toISOString().split('T')[0];
-      const lastCheckDate = localStorage.getItem('lastHabitCheckDate');
-      if (lastCheckDate !== today) {
-        localStorage.setItem('lastHabitCheckDate', today);
-        loadHabits();
-      }
     };
-    window.addEventListener('focus', handleFocus);
-    
-    // Verifica quando a visibilidade da página muda
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        const today = new Date().toISOString().split('T')[0];
-        const lastCheckDate = localStorage.getItem('lastHabitCheckDate');
-        if (lastCheckDate !== today) {
-          localStorage.setItem('lastHabitCheckDate', today);
-          loadHabits();
-        }
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
+    window.addEventListener('day-changed', handleDayChange);
     return () => {
-      clearInterval(dayCheckInterval);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('day-changed', handleDayChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);

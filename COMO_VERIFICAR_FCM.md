@@ -209,3 +209,4 @@ Se você conseguiu:
 **PARABÉNS! O FCM está 100% funcionando! 🚀**
 
 Agora você pode criar Cloud Functions para enviar notificações agendadas automaticamente.
+

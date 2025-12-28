@@ -8,6 +8,8 @@ import { userSettingsService } from '@/lib/firebase/userSettings';
 import { userStatsService } from '@/lib/firebase/userStats';
 import { logger } from '@/lib/utils/logger';
 import { initializeFCM, setupFCMForegroundListener } from '@/lib/firebase/messaging';
+import { initializeFCMWithBackend } from '@/lib/firebase/messagingBackend';
+import { checkBackendHealth } from '@/lib/services/notificationBackend';
 
 interface ScheduledReminder {
   id: string;
@@ -75,7 +77,8 @@ export function usePushNotifications() {
 
     const initFCM = async () => {
       try {
-        const token = await initializeFCM(userId);
+        // Tenta inicializar com backend primeiro, fallback para Firestore apenas
+        const token = await initializeFCMWithBackend(userId);
         if (token) {
           logger.info('FCM inicializado com sucesso');
           
@@ -95,6 +98,15 @@ export function usePushNotifications() {
         }
       } catch (error) {
         logger.error('Erro ao inicializar FCM:', error);
+        // Fallback: tenta inicializar apenas com Firestore
+        try {
+          const token = await initializeFCM(userId);
+          if (token) {
+            logger.info('FCM inicializado apenas no Firestore (backend não disponível)');
+          }
+        } catch (fallbackError) {
+          logger.error('Erro no fallback de FCM:', fallbackError);
+        }
       }
     };
 
@@ -126,6 +138,8 @@ export function usePushNotifications() {
 
   /**
    * Agenda lembretes para hábitos do dia
+   * Usa sistema local (setTimeout) quando app está aberto
+   * O backend (se disponível) lê do Firestore e envia notificações mesmo com app fechado
    */
   const scheduleHabitReminders = useCallback(async () => {
     if (!userId || !hasPermission) return;
@@ -135,28 +149,35 @@ export function usePushNotifications() {
       const today = new Date().toISOString().split('T')[0];
       const now = new Date();
 
-      // Cancela lembretes anteriores
+      // Cancela lembretes anteriores (sistema local)
       scheduledReminders
         .filter(r => r.type === 'habit')
         .forEach(r => pushNotificationService.cancelScheduledNotification(r.timeoutId));
 
       const newReminders: ScheduledReminder[] = [];
+      let habitsWithReminders = 0;
 
       habits.forEach((habit: Habit) => {
         // Verifica se lembrete está ativado E tem horário definido
         if (!habit.reminderEnabled || !habit.reminderTime) return;
 
+        habitsWithReminders++;
+
         // Verifica se o hábito já foi completado hoje
         const isCompletedToday = habit.completedDates?.includes(today);
-        if (isCompletedToday) return;
+        if (isCompletedToday) {
+          return;
+        }
 
         // Parse do horário do lembrete
         const [hours, minutes] = habit.reminderTime.split(':').map(Number);
         const reminderDate = new Date();
         reminderDate.setHours(hours, minutes, 0, 0);
 
-        // Se o horário já passou, não agenda
-        if (reminderDate <= now) return;
+        // Se o horário já passou hoje, agenda para amanhã
+        if (reminderDate <= now) {
+          reminderDate.setDate(reminderDate.getDate() + 1);
+        }
 
         const timeoutId = pushNotificationService.scheduleNotification(
           {
@@ -183,9 +204,18 @@ export function usePushNotifications() {
         ...newReminders,
       ]);
 
-      // Só loga se houver lembretes agendados
-      if (newReminders.length > 0) {
-        logger.info(`${newReminders.length} lembretes de hábitos agendados`);
+      // Loga resultados
+      if (habitsWithReminders > 0) {
+        logger.info(`${newReminders.length} lembretes de hábitos agendados localmente (de ${habitsWithReminders} hábitos com lembretes ativados)`);
+        logger.info(`Nota: O backend (se disponível) também enviará notificações no horário configurado mesmo com app fechado`);
+      }
+
+      // Verifica se backend está disponível
+      const backendAvailable = await checkBackendHealth();
+      if (backendAvailable) {
+        logger.info('Backend disponível - notificações de hábitos também funcionarão com app fechado');
+      } else {
+        logger.info('Backend não disponível - notificações de hábitos funcionam apenas quando app está aberto');
       }
     } catch (error) {
       logger.error('Erro ao agendar lembretes de hábitos:', error);
@@ -194,6 +224,8 @@ export function usePushNotifications() {
 
   /**
    * Agenda lembrete de check-in diário
+   * Usa sistema local (setTimeout) quando app está aberto
+   * O backend (se disponível) lê do Firestore e envia notificações mesmo com app fechado
    */
   const scheduleCheckinReminder = useCallback(async (time: string = '21:00') => {
     if (!userId || !hasPermission) return;
@@ -204,20 +236,25 @@ export function usePushNotifications() {
 
       // Verifica se já fez check-in hoje
       const todayCheckin = await checkinService.getByDate(userId, today);
-      if (todayCheckin) return;
+      if (todayCheckin) {
+        logger.info('Check-in já feito hoje, não agendando lembrete');
+        return;
+      }
 
-      // Cancela lembretes anteriores de check-in
+      // Cancela lembretes anteriores de check-in (sistema local)
       scheduledReminders
         .filter(r => r.type === 'checkin')
         .forEach(r => pushNotificationService.cancelScheduledNotification(r.timeoutId));
 
-      // Parse do horário
+      // Sistema local: agenda para quando o app estiver aberto
       const [hours, minutes] = time.split(':').map(Number);
       const reminderDate = new Date();
       reminderDate.setHours(hours, minutes, 0, 0);
 
-      // Se o horário já passou, não agenda
-      if (reminderDate <= now) return;
+      // Se o horário já passou hoje, agenda para amanhã
+      if (reminderDate <= now) {
+        reminderDate.setDate(reminderDate.getDate() + 1);
+      }
 
       const timeoutId = pushNotificationService.scheduleNotification(
         {
@@ -235,7 +272,16 @@ export function usePushNotifications() {
           ...prev.filter(r => r.type !== 'checkin'),
           { id: 'daily-checkin', timeoutId, type: 'checkin', time },
         ]);
-        logger.info(`Lembrete de check-in agendado para ${time}`);
+        logger.info(`Lembrete de check-in agendado localmente para ${time} (app aberto)`);
+        logger.info(`Nota: O backend (se disponível) também enviará notificação no horário configurado mesmo com app fechado`);
+      }
+
+      // Verifica se backend está disponível e loga status
+      const backendAvailable = await checkBackendHealth();
+      if (backendAvailable) {
+        logger.info('Backend disponível - notificações também funcionarão com app fechado');
+      } else {
+        logger.info('Backend não disponível - notificações funcionam apenas quando app está aberto');
       }
     } catch (error) {
       logger.error('Erro ao agendar lembrete de check-in:', error);
@@ -429,4 +475,6 @@ export function usePushNotifications() {
     scheduledReminders,
   };
 }
+
+
 

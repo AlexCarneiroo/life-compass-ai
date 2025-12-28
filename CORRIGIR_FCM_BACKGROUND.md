@@ -123,3 +123,4 @@ fetch('/firebase-messaging-sw.js')
 - [ ] Teste via Firebase Console funciona
 
 Se todos estão marcados, as notificações devem funcionar em background! 🎉
+

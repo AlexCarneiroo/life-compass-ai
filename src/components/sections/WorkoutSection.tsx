@@ -1458,3 +1458,4 @@ export function WorkoutSection() {
     </div>
   );
 }
+

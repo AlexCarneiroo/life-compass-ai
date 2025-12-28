@@ -21,6 +21,18 @@ export function HabitsWidget() {
     loadHabits();
   }, [userId]);
 
+  // Listener para detectar mudança de dia e recarregar hábitos
+  useEffect(() => {
+    const handleDayChange = () => {
+      loadHabits();
+    };
+
+    window.addEventListener('day-changed', handleDayChange);
+    return () => {
+      window.removeEventListener('day-changed', handleDayChange);
+    };
+  }, []);
+
   const loadHabits = async () => {
     try {
       setLoading(true);

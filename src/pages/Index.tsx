@@ -7,6 +7,7 @@ import { DashboardSection } from '@/components/sections/DashboardSection';
 import { PINModal } from '@/components/ui/PINModal';
 import { useAuth } from '@/hooks/useAuth';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { useDayChange } from '@/hooks/useDayChange';
 import { userSettingsService } from '@/lib/firebase/userSettings';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
@@ -69,6 +70,9 @@ const Index = () => {
   const [protectedSections, setProtectedSections] = useState<string[]>([]);
   const [verifiedSections, setVerifiedSections] = useState<Set<string>>(new Set());
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Inicializa a detecção de mudança de dia (reseta check-ins, hábitos, etc)
+  useDayChange();
 
   // Pull to refresh (mobile)
   const handleRefresh = useCallback(async () => {

@@ -539,3 +539,4 @@ export const workoutsService = {
     return allChallenges.filter(c => c.participants?.includes(userId));
   },
 };
+

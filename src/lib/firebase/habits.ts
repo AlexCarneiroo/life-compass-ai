@@ -73,10 +73,13 @@ export const habitsService = {
         });
       }
       
+      // Normaliza as datas completadas para garantir formato YYYY-MM-DD
+      const normalizedCompletedDates = (data.completedDates || []).map((d: string) => d.split('T')[0]);
+      
       return {
         id: doc.id,
         ...data,
-        completedDates: data.completedDates || [],
+        completedDates: normalizedCompletedDates,
         difficulty,
         xp,
       } as Habit;
@@ -102,17 +105,23 @@ export const habitsService = {
     const habitRef = doc(db, COLLECTION, habitId);
     
     try {
+      // Normaliza a data para formato YYYY-MM-DD (remove hora se houver)
+      const normalizedDate = date.split('T')[0];
+      
       // Busca o documento diretamente pelo ID
       const habitSnap = await getDoc(habitRef);
       
       if (habitSnap.exists()) {
         const habitData = habitSnap.data() as Habit;
         const completedDates = habitData.completedDates || [];
-        if (!completedDates.includes(date)) {
+        // Normaliza as datas existentes também
+        const normalizedCompletedDates = completedDates.map(d => d.split('T')[0]);
+        
+        if (!normalizedCompletedDates.includes(normalizedDate)) {
           // Importa função de cálculo de streak
           const { calculateStreak } = await import('../utils/habits');
           
-          const newCompletedDates = [...completedDates, date];
+          const newCompletedDates = [...normalizedCompletedDates, normalizedDate];
           const newStreak = calculateStreak({
             ...habitData,
             completedDates: newCompletedDates,
@@ -136,12 +145,17 @@ export const habitsService = {
     const habitRef = doc(db, COLLECTION, habitId);
     
     try {
+      // Normaliza a data para formato YYYY-MM-DD (remove hora se houver)
+      const normalizedDate = date.split('T')[0];
+      
       const habitSnap = await getDoc(habitRef);
       
       if (habitSnap.exists()) {
         const habitData = habitSnap.data() as Habit;
         const completedDates = habitData.completedDates || [];
-        const newCompletedDates = completedDates.filter(d => d !== date);
+        // Normaliza as datas existentes também
+        const normalizedCompletedDates = completedDates.map(d => d.split('T')[0]);
+        const newCompletedDates = normalizedCompletedDates.filter(d => d !== normalizedDate);
         
         // Importa função de cálculo de streak
         const { calculateStreak } = await import('../utils/habits');

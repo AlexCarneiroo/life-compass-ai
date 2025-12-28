@@ -77,6 +77,21 @@ export function CheckinSection() {
     };
   }, [userId]);
 
+  // Listener para detectar mudança de dia e resetar
+  useEffect(() => {
+    if (!userId) return;
+    
+    const handleDayChange = () => {
+      // Quando o dia muda, recarrega o check-in (que deve estar vazio para o novo dia)
+      loadTodayCheckin();
+    };
+
+    window.addEventListener('day-changed', handleDayChange);
+    return () => {
+      window.removeEventListener('day-changed', handleDayChange);
+    };
+  }, [userId]);
+
   // Detectar status online/offline
   useEffect(() => {
     const handleOnline = () => {

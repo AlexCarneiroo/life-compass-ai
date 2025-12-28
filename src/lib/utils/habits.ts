@@ -83,21 +83,41 @@ export function calculateStreak(habit: Habit): number {
   
   switch (habit.frequency) {
     case 'daily': {
-      // Streak diário: dias consecutivos
-      let expectedDate = new Date(today);
-      expectedDate.setHours(0, 0, 0, 0);
+      // Streak diário: dias consecutivos a partir de hoje ou ontem
+      // Normaliza as datas para strings no formato YYYY-MM-DD para comparação
+      const dateSet = new Set(sortedDates.map(d => {
+        const date = new Date(d);
+        return date.toISOString().split('T')[0];
+      }));
       
-      for (const dateStr of sortedDates) {
-        const completedDate = new Date(dateStr);
-        completedDate.setHours(0, 0, 0, 0);
-        
-        if (completedDate.getTime() === expectedDate.getTime()) {
-          streak++;
-          expectedDate.setDate(expectedDate.getDate() - 1);
-        } else if (completedDate < expectedDate) {
-          // Se a data completada é anterior à esperada, não quebra o streak
-          // mas também não incrementa
-          break;
+      // Começa verificando se completou hoje ou ontem
+      let currentDate = new Date(today);
+      let startCounting = false;
+      
+      // Se completou hoje, começa a contar de hoje
+      const todayStr = today.toISOString().split('T')[0];
+      if (dateSet.has(todayStr)) {
+        startCounting = true;
+      } else {
+        // Se não completou hoje, verifica se completou ontem
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        if (dateSet.has(yesterdayStr)) {
+          startCounting = true;
+          currentDate = yesterday;
+        }
+      }
+      
+      if (startCounting) {
+        while (true) {
+          const dateStr = currentDate.toISOString().split('T')[0];
+          if (dateSet.has(dateStr)) {
+            streak++;
+            currentDate.setDate(currentDate.getDate() - 1);
+          } else {
+            break;
+          }
         }
       }
       break;
@@ -105,23 +125,46 @@ export function calculateStreak(habit: Habit): number {
     
     case 'weekly': {
       // Streak semanal: semanas consecutivas
-      let currentWeek = new Date(today);
-      currentWeek.setDate(today.getDate() - today.getDay()); // Domingo da semana
-      currentWeek.setHours(0, 0, 0, 0);
-      
+      // Agrupa as datas completadas por semana
+      const weeksSet = new Set<string>();
       for (const dateStr of sortedDates) {
         const completedDate = new Date(dateStr);
         completedDate.setHours(0, 0, 0, 0);
-        
-        const completedWeek = new Date(completedDate);
-        completedWeek.setDate(completedDate.getDate() - completedDate.getDay());
-        completedWeek.setHours(0, 0, 0, 0);
-        
-        if (completedWeek.getTime() === currentWeek.getTime()) {
-          streak++;
-          currentWeek.setDate(currentWeek.getDate() - 7);
-        } else if (completedWeek < currentWeek) {
-          break;
+        const weekStart = new Date(completedDate);
+        weekStart.setDate(completedDate.getDate() - completedDate.getDay()); // Domingo da semana
+        weekStart.setHours(0, 0, 0, 0);
+        weeksSet.add(weekStart.toISOString().split('T')[0]);
+      }
+      
+      // Começa verificando se completou esta semana ou a semana passada
+      let currentWeek = new Date(today);
+      currentWeek.setDate(today.getDate() - today.getDay()); // Domingo desta semana
+      currentWeek.setHours(0, 0, 0, 0);
+      let startCounting = false;
+      
+      const thisWeekStr = currentWeek.toISOString().split('T')[0];
+      if (weeksSet.has(thisWeekStr)) {
+        startCounting = true;
+      } else {
+        // Se não completou esta semana, verifica a semana passada
+        const lastWeek = new Date(currentWeek);
+        lastWeek.setDate(lastWeek.getDate() - 7);
+        const lastWeekStr = lastWeek.toISOString().split('T')[0];
+        if (weeksSet.has(lastWeekStr)) {
+          startCounting = true;
+          currentWeek = lastWeek;
+        }
+      }
+      
+      if (startCounting) {
+        while (true) {
+          const weekStr = currentWeek.toISOString().split('T')[0];
+          if (weeksSet.has(weekStr)) {
+            streak++;
+            currentWeek.setDate(currentWeek.getDate() - 7);
+          } else {
+            break;
+          }
         }
       }
       break;
@@ -129,21 +172,43 @@ export function calculateStreak(habit: Habit): number {
     
     case 'monthly': {
       // Streak mensal: meses consecutivos
-      let currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      currentMonth.setHours(0, 0, 0, 0);
-      
+      // Agrupa as datas completadas por mês
+      const monthsSet = new Set<string>();
       for (const dateStr of sortedDates) {
         const completedDate = new Date(dateStr);
         completedDate.setHours(0, 0, 0, 0);
-        
-        const completedMonth = new Date(completedDate.getFullYear(), completedDate.getMonth(), 1);
-        completedMonth.setHours(0, 0, 0, 0);
-        
-        if (completedMonth.getTime() === currentMonth.getTime()) {
-          streak++;
-          currentMonth.setMonth(currentMonth.getMonth() - 1);
-        } else if (completedMonth < currentMonth) {
-          break;
+        const monthKey = `${completedDate.getFullYear()}-${String(completedDate.getMonth() + 1).padStart(2, '0')}`;
+        monthsSet.add(monthKey);
+      }
+      
+      // Começa verificando se completou este mês ou o mês passado
+      let currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      currentMonth.setHours(0, 0, 0, 0);
+      let startCounting = false;
+      
+      const thisMonthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+      if (monthsSet.has(thisMonthKey)) {
+        startCounting = true;
+      } else {
+        // Se não completou este mês, verifica o mês passado
+        const lastMonth = new Date(currentMonth);
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        const lastMonthKey = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
+        if (monthsSet.has(lastMonthKey)) {
+          startCounting = true;
+          currentMonth = lastMonth;
+        }
+      }
+      
+      if (startCounting) {
+        while (true) {
+          const monthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+          if (monthsSet.has(monthKey)) {
+            streak++;
+            currentMonth.setMonth(currentMonth.getMonth() - 1);
+          } else {
+            break;
+          }
         }
       }
       break;
@@ -174,6 +239,7 @@ export function getLast7Days(): Array<{ date: string; dayName: string; isToday: 
 export function isCompletedOnDate(habit: Habit, date: string): boolean {
   return habit.completedDates?.includes(date) || false;
 }
+
 
 
 

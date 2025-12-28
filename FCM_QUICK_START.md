@@ -79,3 +79,4 @@ Veja `FCM_SETUP.md` para:
 2. Procure por: "Token FCM obtido com sucesso"
 3. Verifique Firestore: `fcmTokens/{userId}` deve ter um documento com tokens
 4. Teste: Feche o app e envie uma notificação via Cloud Function
+

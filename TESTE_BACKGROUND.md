@@ -159,3 +159,5 @@ Antes de testar, verifique:
 
 Se todos estão marcados e ainda não funciona, verifique os logs do service worker (Inspect) para ver erros específicos.
 
+
+

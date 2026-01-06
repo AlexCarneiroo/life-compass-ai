@@ -157,12 +157,12 @@ export function FinanceSection() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex-col items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Financeiro</h1>
           <p className="text-muted-foreground mt-1">Controle seus gastos e alcance suas metas</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-3">
           <Button variant="outline" size="sm" onClick={() => setPeriod('week')} className={period === 'week' ? 'bg-muted' : ''}>
             Semana
           </Button>
@@ -259,7 +259,7 @@ export function FinanceSection() {
                 <Button variant="outline" onClick={handleCloseModal}>
                   Cancelar
                 </Button>
-                <Button onClick={handleSaveEntry}>
+                <Button onClick={handleSaveEntry} className='mb-3'>
                   Adicionar Transação
                 </Button>
               </DialogFooter>

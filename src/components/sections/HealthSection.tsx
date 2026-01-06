@@ -570,7 +570,7 @@ export function HealthSection() {
                     id="height"
                     type="number"
                     step="0.01"
-                    placeholder={userHeight ? userHeight.toString() : "1.75"}
+                    placeholder={userHeight ? userHeight.toString() : "0"}
                     value={healthFormData.height || userHeight || ''}
                     onChange={(e) => setHealthFormData({ ...healthFormData, height: parseFloat(e.target.value) || undefined })}
                   />
@@ -628,7 +628,7 @@ export function HealthSection() {
               <Button variant="outline" onClick={() => setIsHealthModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleSaveHealthData}>
+              <Button onClick={handleSaveHealthData} className='mb-3'> 
                 Salvar
               </Button>
             </DialogFooter>
@@ -1056,7 +1056,7 @@ export function HealthSection() {
                       onChange={(e) => setGoalsFormData({ ...goalsFormData, sleepGoal: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
-                  <div className="space-y-2">
+{/*                   <div className="space-y-2">
                     <Label htmlFor="heightGoal">Altura (cm)</Label>
                     <Input
                       id="heightGoal"
@@ -1065,13 +1065,13 @@ export function HealthSection() {
                       value={goalsFormData.height}
                       onChange={(e) => setGoalsFormData({ ...goalsFormData, height: parseInt(e.target.value) || 0 })}
                     />
-                  </div>
+                  </div> */}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsGoalsModalOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleSaveHealthGoals}>
+                  <Button onClick={handleSaveHealthGoals} className='mb-3'>
                     Salvar Metas
                   </Button>
                 </DialogFooter>

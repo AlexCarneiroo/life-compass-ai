@@ -84,3 +84,5 @@ O sistema funciona automaticamente:
 
 **Status:** ✅ Pronto para uso!
 
+
+

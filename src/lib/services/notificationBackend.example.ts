@@ -163,3 +163,5 @@ async function exemploRemoverToken(userId: string, fcmToken: string) {
   console.log('Token removido do backend');
 }
 
+
+

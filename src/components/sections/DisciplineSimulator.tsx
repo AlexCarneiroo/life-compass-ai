@@ -351,7 +351,7 @@ export function DisciplineSimulator({ habit, onChallengeUpdate }: DisciplineSimu
                 <Button variant="outline" onClick={() => setIsModalOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleStartChallenge} className="gradient-primary text-primary-foreground">
+                <Button onClick={handleStartChallenge} className="mb-3 gradient-primary text-primary-foreground">
                   Iniciar Desafio
                 </Button>
               </DialogFooter>

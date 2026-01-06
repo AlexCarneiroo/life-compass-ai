@@ -127,7 +127,7 @@ export function MoodChart() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-1 sm:px-2">
         {loading ? (
           <div className="h-64 sm:h-80 flex items-center justify-center">
             <p className="text-muted-foreground">Carregando dados...</p>
@@ -138,9 +138,9 @@ export function MoodChart() {
             <p className="text-sm text-muted-foreground">Faça um check-in para ver sua evolução</p>
           </div>
         ) : (
-          <div className="h-64 sm:h-80">
+          <div className="h-64 sm:h-80 w-full -mx-1 sm:-mx-2">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <AreaChart data={data} margin={{ top: 10, right: 5, left: -15, bottom: 5 }}>
               <defs>
                 <linearGradient id="colorMood" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(175, 70%, 45%)" stopOpacity={0.3}/>
@@ -161,12 +161,16 @@ export function MoodChart() {
                 tickLine={false}
                 tick={{ fill: 'hsl(220, 10%, 45%)', fontSize: 12 }}
                 interval={0}
+                padding={{ left: 0, right: 0 }}
               />
               <YAxis 
                 domain={[0, 10]}
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                width={25}
+                padding={{ top: 0, bottom: 0 }}
+                tickMargin={5}
               />
               <Tooltip 
                 content={({ active, payload, label }) => {

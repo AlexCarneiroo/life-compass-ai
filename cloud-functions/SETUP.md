@@ -141,3 +141,5 @@ No Firebase Console, certifique-se de que as regras do Firestore permitem:
 - Aguarde alguns minutos após deploy
 - Verifique se o deploy foi bem-sucedido: `firebase functions:list`
 
+
+

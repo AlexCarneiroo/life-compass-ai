@@ -311,3 +311,5 @@ src/
 
 Tudo está implementado, testado e documentado. Basta configurar as variáveis de ambiente e usar!
 
+
+

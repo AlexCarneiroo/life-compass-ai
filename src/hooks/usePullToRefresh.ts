@@ -96,7 +96,8 @@ export function usePullToRefresh({
       setIsRefreshing(true);
       setPullDistance(threshold); // Mantém no threshold durante refresh
       try {
-        await onRefresh();
+/*         window.location.reload();
+ */        await onRefresh();
       } finally {
         // Pequeno delay antes de esconder para feedback visual
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -143,5 +144,7 @@ export function usePullToRefresh({
     progress: Math.min(pullDistance / threshold, 1),
   };
 }
+
+
 
 

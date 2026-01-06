@@ -661,7 +661,7 @@ export function HabitsSection() {
               <Button variant="outline" onClick={handleCloseModal}>
                 Cancelar
               </Button>
-              <Button onClick={handleSaveHabit}>
+              <Button className='mb-3' onClick={handleSaveHabit}>
                 {editingHabit ? 'Salvar Alterações' : 'Criar Hábito'}
               </Button>
             </DialogFooter>
@@ -899,7 +899,7 @@ export function HabitsSection() {
                     variant="outline"
                     size="sm"
                     onClick={() => setShowDisciplineSimulator(habit.id)}
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto mt-3"
                   >
                     <Sparkles className="w-4 h-4 mr-2" />
                     Iniciar Desafio

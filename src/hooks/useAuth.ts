@@ -56,7 +56,7 @@ export function useAuth() {
   return { 
     user, 
     loading, 
-    userId: user?.uid || 'demo-user',
+    userId: user?.uid || '',
     loginWithEmail,
     registerWithEmail,
     loginWithGoogle,

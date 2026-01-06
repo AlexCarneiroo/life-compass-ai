@@ -161,3 +161,5 @@ npm run build
 
 📚 Para mais detalhes, veja `SETUP.md` e `INTEGRATION.md`
 
+
+

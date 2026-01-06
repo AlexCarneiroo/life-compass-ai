@@ -1062,7 +1062,7 @@ export function WorkoutSection() {
             <Button variant="outline" onClick={() => setIsWorkoutModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveWorkout}>
+            <Button onClick={handleSaveWorkout} className='mb-3'>
               Salvar
             </Button>
           </DialogFooter>
@@ -1232,7 +1232,7 @@ export function WorkoutSection() {
                 >
                   Cancelar
                 </Button>
-                <Button onClick={handleSaveChallenge} className="w-full sm:w-auto">
+                <Button onClick={handleSaveChallenge} className="w-full sm:w-auto mb-3">
                   Salvar
                 </Button>
               </>
@@ -1458,4 +1458,6 @@ export function WorkoutSection() {
     </div>
   );
 }
+
+
 

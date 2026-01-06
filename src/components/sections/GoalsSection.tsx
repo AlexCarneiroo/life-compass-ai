@@ -119,7 +119,7 @@ export function GoalsSection() {
 
     const validSubtasks = formData.subtasks.filter(s => s.title.trim());
     if (validSubtasks.length === 0) {
-      toast.error('Adicione pelo menos uma subtarefa');
+      toast.error('Adicione pelo menos uma subMetas');
       return;
     }
 
@@ -242,7 +242,7 @@ export function GoalsSection() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Subtarefas</Label>
+                  <Label>SubMetas</Label>
                   <Button type="button" variant="outline" size="sm" onClick={handleAddSubtask}>
                     <Plus className="w-4 h-4 mr-2" />
                     Adicionar
@@ -252,7 +252,7 @@ export function GoalsSection() {
                   {formData.subtasks.map((subtask, index) => (
                     <div key={subtask.id} className="flex items-center gap-2">
                       <Input
-                        placeholder={`Subtarefa ${index + 1}`}
+                        placeholder={`SubMeta ${index + 1}`}
                         value={subtask.title}
                         onChange={(e) => handleUpdateSubtask(subtask.id, e.target.value)}
                       />
@@ -275,7 +275,7 @@ export function GoalsSection() {
               <Button variant="outline" onClick={handleCloseModal}>
                 Cancelar
               </Button>
-              <Button onClick={handleSaveGoal}>
+              <Button onClick={handleSaveGoal} className='mb-3'>
                 Criar Meta
               </Button>
             </DialogFooter>
@@ -313,7 +313,7 @@ export function GoalsSection() {
           </CardContent>
         </Card>
 
-        <Card className="glass-card">
+{/*         <Card className="glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl gradient-pink flex items-center justify-center">
@@ -321,12 +321,12 @@ export function GoalsSection() {
               </div>
               <div>
                 <p className="text-2xl font-bold">12</p>
-                <p className="text-xs text-muted-foreground">Tarefas feitas</p>
+                <p className="text-xs text-muted-foreground">Metas feitas</p>
               </div>
             </div>
           </CardContent>
-        </Card>
-
+        </Card> */}
+{/* 
         <Card className="glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -339,7 +339,7 @@ export function GoalsSection() {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Category Filter */}
@@ -407,7 +407,7 @@ export function GoalsSection() {
                     <div className="mt-3">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-muted-foreground">
-                          {completedSubtasks}/{goal.subtasks.length} tarefas
+                          {completedSubtasks}/{goal.subtasks.length} Metas
                         </span>
                         <span className="text-sm font-semibold">{goal.progress}%</span>
                       </div>
@@ -436,7 +436,7 @@ export function GoalsSection() {
                     {/* Expanded Subtasks */}
                     {isExpanded && (
                       <div className="mt-4 pt-4 border-t border-border space-y-2 animate-fade-in">
-                        <p className="text-sm font-medium mb-3">Subtarefas:</p>
+                        <p className="text-sm font-medium mb-3">SubMetas:</p>
                         {goal.subtasks.map((subtask) => (
                           <div
                             key={subtask.id}

@@ -230,3 +230,5 @@ export const sendCheckinReminderHTTP = functions
 1. Inicie o emulador: `firebase emulators:start --only functions`
 2. Use a URL local: `http://localhost:5001/controll-v/us-central1/sendCheckinReminder`
 
+
+

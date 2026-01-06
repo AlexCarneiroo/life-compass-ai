@@ -171,3 +171,5 @@ Ou se backend não estiver disponível:
 
 **Status:** ✅ Correções implementadas. Sistema agora funciona melhor com app aberto e está preparado para funcionar com app fechado quando backend estiver configurado.
 
+
+

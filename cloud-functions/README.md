@@ -70,3 +70,5 @@ Todas as funções HTTP estão protegidas com autenticação Firebase. Apenas us
 - Os tokens FCM são armazenados na coleção `fcmTokens` no Firestore
 - A estrutura de dados está documentada em `functions/src/types.ts`
 
+
+

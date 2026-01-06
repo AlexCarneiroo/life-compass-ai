@@ -166,3 +166,5 @@ O sistema suporta os seguintes tipos de notificações:
 - Use Cloud Functions ou backend para enviar notificações em produção
 - Não exponha tokens de acesso OAuth2 no frontend
 
+
+

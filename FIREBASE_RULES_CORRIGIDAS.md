@@ -104,3 +104,5 @@ Após aplicar as regras:
 
 
 
+
+

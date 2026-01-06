@@ -136,3 +136,5 @@ VITE_NOTIFICATION_API_URL=http://localhost:3000/api
 - Reinicie o servidor após criar/editar `.env`
 - Variáveis devem começar com `VITE_` para serem expostas
 
+
+

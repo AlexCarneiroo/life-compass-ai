@@ -261,3 +261,5 @@ Usuário clica → Abre app
 
 **Status:** ✅ Integração completa e pronta para uso!
 
+
+

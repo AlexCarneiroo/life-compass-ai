@@ -208,6 +208,16 @@ export function SettingsSection() {
       setCheckinReminderEnabled(settings.checkinReminderEnabled || false);
       setCheckinReminderTime(settings.checkinReminderTime || '21:00');
       setHabitRemindersEnabled(settings.habitRemindersEnabled || false);
+      
+      // Agenda lembretes se estiverem habilitados e houver permissão
+      if (hasPushPermission) {
+        if (settings.checkinReminderEnabled && settings.checkinReminderTime) {
+          await scheduleCheckinReminder(settings.checkinReminderTime);
+        }
+        if (settings.habitRemindersEnabled) {
+          await scheduleHabitReminders();
+        }
+      }
     } catch (error) {
       logger.error('Erro ao carregar configurações:', error);
     }
@@ -1121,9 +1131,15 @@ export function SettingsSection() {
                               type="time"
                               value={checkinReminderTime}
                               onChange={async (e) => {
-                                setCheckinReminderTime(e.target.value);
-                                await userSettingsService.saveNotificationSettings(userId, { checkinReminderTime: e.target.value });
-                                scheduleCheckinReminder(e.target.value);
+                                const newTime = e.target.value;
+                                setCheckinReminderTime(newTime);
+                                try {
+                                  await userSettingsService.saveNotificationSettings(userId, { checkinReminderTime: newTime });
+                                  scheduleCheckinReminder(newTime);
+                                  toast.success('Horário do check-in atualizado!');
+                                } catch (error) {
+                                  toast.error('Erro ao salvar horário');
+                                }
                               }}
                               className="h-6 w-24 text-xs"
                             />
@@ -1135,8 +1151,17 @@ export function SettingsSection() {
                       checked={checkinReminderEnabled}
                       onCheckedChange={async (checked) => {
                         setCheckinReminderEnabled(checked);
-                        await userSettingsService.saveNotificationSettings(userId, { checkinReminderEnabled: checked });
-                        if (checked) scheduleCheckinReminder(checkinReminderTime);
+                        try {
+                          await userSettingsService.saveNotificationSettings(userId, { checkinReminderEnabled: checked });
+                          if (checked && checkinReminderTime) {
+                            scheduleCheckinReminder(checkinReminderTime);
+                            toast.success('Check-in diário ativado!');
+                          } else if (!checked) {
+                            toast.success('Check-in diário desativado');
+                          }
+                        } catch (error) {
+                          toast.error('Erro ao salvar configuração');
+                        }
                       }}
                     />
                   </div>

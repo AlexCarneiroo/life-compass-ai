@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
@@ -17,7 +17,7 @@ import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, 
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { financeService } from '@/lib/firebase/finance';
-import { useEffect } from 'react';
+ 
 
 export function FinanceSection() {
   const { userId } = useAuth();
@@ -33,6 +33,10 @@ export function FinanceSection() {
   });
 
   useEffect(() => {
+    if (!userId) {
+      setEntries([]);
+      return;
+    }
     loadEntries();
   }, [userId]);
 
@@ -55,7 +59,9 @@ export function FinanceSection() {
     .reduce((sum, e) => sum + e.amount, 0);
 
   const balance = totalIncome - totalExpenses;
-  const savingsRate = ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(0);
+  const savingsRate = totalIncome === 0
+    ? '0'
+    : Math.round(((totalIncome - totalExpenses) / totalIncome) * 100).toString();
 
   // Expenses by category
   const expensesByCategory = entries

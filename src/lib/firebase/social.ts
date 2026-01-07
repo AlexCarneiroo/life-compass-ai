@@ -456,6 +456,31 @@ export const socialService = {
       data: { streak },
     });
   },
+
+  async shareHabitChallenge(userId: string, habitName: string, completionCount: number): Promise<void> {
+    if (completionCount % 5 !== 0) return; // Compartilha a cada 5 completações
+    
+    await this.createPost(userId, {
+      type: 'habit_complete',
+      title: `Completou "${habitName}" ${completionCount} vezes!`,
+      description: `Mostrando consistência e determinação com este hábito!`,
+      icon: '✅',
+      data: { habitName, completionCount },
+    });
+  },
+
+  async shareGoalMilestone(userId: string, goalName: string, progressPercent: number): Promise<void> {
+    if (progressPercent !== 25 && progressPercent !== 50 && progressPercent !== 75 && progressPercent !== 100) return;
+    
+    const milestoneText = progressPercent === 100 ? 'Alcançou' : `Chegou a ${progressPercent}%`;
+    await this.createPost(userId, {
+      type: 'goal_complete',
+      title: `${milestoneText} a meta: "${goalName}"`,
+      description: `Progredindo rumo aos objetivos!`,
+      icon: progressPercent === 100 ? '🎯' : '📈',
+      data: { goalName, progressPercent },
+    });
+  },
 };
 
 

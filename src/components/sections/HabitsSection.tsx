@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useAuth } from '@/hooks/useAuth';
 import { userStatsService, checkAndGrantBadges } from '@/lib/firebase/userStats';
 import { habitsService } from '@/lib/firebase/habits';
+import { socialService } from '@/lib/firebase/social';
 import { Habit, Badge } from '@/types';
 import { cn } from '@/lib/utils';
 import { 
@@ -25,8 +26,10 @@ import {
   HabitDifficulty 
 } from '@/lib/utils/habitDifficulty';
 import { Check, Flame, Plus, Trophy, Target, Star, Zap, MoreVertical, Edit, Trash2, Lock, Sparkles, Bell, Clock } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { DisciplineSimulator } from './DisciplineSimulator';
 import { disciplineChallengeService, DisciplineChallenge } from '@/lib/firebase/disciplineChallenge';
 import { Badge as UIBadge } from '@/components/ui/badge';
@@ -92,7 +95,7 @@ function BadgesDisplay({ userId }: { userId: string }) {
 }
 
 // Componente para visualização semanal tipo Duolingo
-function WeeklyView({ habit, habitIndex, onToggle }: { habit: Habit; habitIndex: number; onToggle: (date: string) => void }) {
+function WeeklyView({ habit, habitIndex, onToggle, isToggling }: { habit: Habit; habitIndex: number; onToggle: (date: string) => void; isToggling?: boolean }) {
   const last7Days = getLast7Days();
   const habitColor = getHabitColor(habit, habitIndex);
   const today = new Date().toISOString().split('T')[0];
@@ -108,11 +111,11 @@ function WeeklyView({ habit, habitIndex, onToggle }: { habit: Habit; habitIndex:
           <div key={day.date} className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
             <button
               onClick={() => {
-                if (canComplete) {
+                if (canComplete && !isToggling) {
                   onToggle(day.date);
                 }
               }}
-              disabled={!canComplete && !isCompleted}
+              disabled={(!canComplete && !isCompleted) || !!isToggling}
               className={cn(
                 "w-9 h-9 sm:w-10 sm:h-10 rounded-lg transition-all duration-200 flex items-center justify-center relative flex-shrink-0",
                 isCompleted 
@@ -129,7 +132,9 @@ function WeeklyView({ habit, habitIndex, onToggle }: { habit: Habit; habitIndex:
               }}
               title={`${day.dayName} - ${day.date}${isToday ? ' (Hoje)' : ''}`}
             >
-              {isCompleted ? (
+              {isToggling ? (
+                <Spinner className="w-4 h-4 text-muted-foreground" />
+              ) : isCompleted ? (
                 <Check className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               ) : !canComplete ? (
                 <Lock className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
@@ -150,7 +155,9 @@ function WeeklyView({ habit, habitIndex, onToggle }: { habit: Habit; habitIndex:
 
 export function HabitsSection() {
   const { userId } = useAuth();
+  const { scheduleHabitReminders } = usePushNotifications();
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [togglingIds, setTogglingIds] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -352,6 +359,9 @@ export function HabitsSection() {
         await loadHabits();
         toast.success('Hábito criado com sucesso!');
       }
+      
+      // Re-agenda lembretes após salvar
+      await scheduleHabitReminders();
       handleCloseModal();
     } catch (error) {
       console.error('Erro ao salvar hábito:', error);
@@ -371,12 +381,16 @@ export function HabitsSection() {
   };
 
   const toggleHabit = async (habitId: string, date: string) => {
+    // evita concorrer operações para o mesmo hábito
+    if (togglingIds.includes(habitId)) return;
     const habit = habits.find(h => h.id === habitId);
     if (!habit) return;
 
     const isCompleted = isCompletedOnDate(habit, date);
     const today = new Date().toISOString().split('T')[0];
     
+    // marca como em progresso
+    setTogglingIds(prev => [...prev, habitId]);
     try {
       if (isCompleted) {
         // Desmarca
@@ -443,6 +457,27 @@ export function HabitsSection() {
               description: badge.description,
               duration: 5000,
             });
+            // Compartilha a conquista no feed social
+            try {
+              await socialService.shareAchievement(userId, {
+                id: badge.id,
+                name: badge.name,
+                icon: badge.icon || '🏆',
+              });
+            } catch (error) {
+              console.error('Erro ao compartilhar conquista:', error);
+            }
+          }
+          
+          // Compartilha completação de hábito a cada 5 vezes
+          const updatedStats = await userStatsService.getOrCreate(userId);
+          const completionCount = updatedHabit?.completedDates?.length || 0;
+          if (completionCount > 0 && completionCount % 5 === 0) {
+            try {
+              await socialService.shareHabitChallenge(userId, habit.name, completionCount);
+            } catch (error) {
+              console.error('Erro ao compartilhar desafio de hábito:', error);
+            }
           }
           
           toast.success(`+${habit.xp} XP ganho!`);
@@ -456,6 +491,10 @@ export function HabitsSection() {
     } catch (error) {
       console.error('Erro ao marcar hábito:', error);
       toast.error('Erro ao atualizar hábito');
+    }
+    finally {
+      // remove flag de progresso
+      setTogglingIds(prev => prev.filter(id => id !== habitId));
     }
   };
 
@@ -779,10 +818,14 @@ export function HabitsSection() {
                       "w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center text-2xl sm:text-3xl transition-all cursor-pointer flex-shrink-0",
                       isCompletedToday ? "bg-success/20" : "bg-muted"
                     )}
-                    onClick={() => toggleHabit(habit.id, getToday())}
+                    onClick={() => !togglingIds.includes(habit.id) && toggleHabit(habit.id, getToday())}
                     style={isCompletedToday ? { backgroundColor: `${habitColor}20` } : undefined}
                   >
-                    {habit.icon}
+                    {togglingIds.includes(habit.id) ? (
+                      <Spinner className="w-6 h-6 text-muted-foreground" />
+                    ) : (
+                      habit.icon
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -824,13 +867,17 @@ export function HabitsSection() {
                           ? "bg-success border-success text-success-foreground" 
                           : "border-muted-foreground/30 hover:border-primary"
                       )}
-                      onClick={() => toggleHabit(habit.id, getToday())}
+                      onClick={() => !togglingIds.includes(habit.id) && toggleHabit(habit.id, getToday())}
                       style={isCompletedToday ? { 
                         backgroundColor: habitColor, 
                         borderColor: habitColor 
                       } : undefined}
                     >
-                      {isCompletedToday && <Check className="w-4 h-4 sm:w-5 sm:h-5 text-white" />}
+                      {togglingIds.includes(habit.id) ? (
+                        <Spinner className="w-4 h-4 text-white" />
+                      ) : (
+                        isCompletedToday && <Check className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                      )}
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -919,7 +966,7 @@ export function HabitsSection() {
                       }).length || 0} completados
                     </span>
                   </div>
-                  <WeeklyView habit={habit} habitIndex={index} onToggle={(date) => toggleHabit(habit.id, date)} />
+                  <WeeklyView habit={habit} habitIndex={index} onToggle={(date) => toggleHabit(habit.id, date)} isToggling={togglingIds.includes(habit.id)} />
                 </div>
 
               </div>

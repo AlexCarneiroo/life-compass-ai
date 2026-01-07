@@ -113,6 +113,8 @@ export function WorkoutSection() {
     date: new Date().toISOString().split('T')[0],
     exercises: [],
   });
+  const [durationHours, setDurationHours] = useState<number>(Math.floor((workoutForm.duration || 30) / 60));
+  const [durationMinutes, setDurationMinutes] = useState<number>((workoutForm.duration || 30) % 60);
   
   const [challengeForm, setChallengeForm] = useState<Partial<WorkoutChallenge>>({
     name: '',
@@ -192,11 +194,37 @@ export function WorkoutSection() {
     }
   };
 
+  // Sincroniza os campos de horas/minutos quando o formulário muda ou modal abre
+  useEffect(() => {
+    const d = workoutForm.duration || 0;
+    setDurationHours(Math.floor(d / 60));
+    setDurationMinutes(d % 60);
+  }, [workoutForm.duration, isWorkoutModalOpen]);
+
+  const formatDuration = (mins: number | undefined) => {
+    if (!mins && mins !== 0) return '';
+    const m = Math.max(0, mins);
+    if (m >= 60) {
+      const h = Math.floor(m / 60);
+      const r = m % 60;
+      return r > 0 ? `${h}h ${r}m` : `${h}h`;
+    }
+    return `${m} min`;
+  };
+
   const handleSaveWorkout = async () => {
-    if (!workoutForm.modality || !workoutForm.duration || !workoutForm.date) {
+    if (!workoutForm.modality || !workoutForm.date) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
+
+    // Converte hours/minutes para minutos totais antes de salvar
+    const totalMinutes = (Number(durationHours) || 0) * 60 + (Number(durationMinutes) || 0);
+    if (totalMinutes <= 0) {
+      toast.error('Informe uma duração válida (horas ou minutos)');
+      return;
+    }
+    workoutForm.duration = totalMinutes;
 
     try {
       if (editingWorkout) {
@@ -714,7 +742,7 @@ export function WorkoutSection() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Duração</span>
-                      <span className="font-semibold">{workout.duration} min</span>
+                        <span className="font-semibold">{formatDuration(workout.duration)}</span>
                     </div>
                     {workout.calories && (
                       <div className="flex items-center justify-between text-sm">
@@ -903,14 +931,33 @@ export function WorkoutSection() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Duração (min)</Label>
-                <Input
-                  type="number"
-                  value={workoutForm.duration}
-                  onChange={(e) => setWorkoutForm({ ...workoutForm, duration: parseInt(e.target.value) || 0 })}
-                />
+                <Label>Duração</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={durationHours}
+                    onChange={(e) => setDurationHours(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-20"
+                  />
+                  <span className="text-sm text-muted-foreground">h</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={durationMinutes}
+                    onChange={(e) => {
+                      let v = parseInt(e.target.value) || 0;
+                      if (v < 0) v = 0;
+                      if (v > 59) v = 59;
+                      setDurationMinutes(v);
+                    }}
+                    className="w-20"
+                  />
+                  <span className="text-sm text-muted-foreground">m</span>
+                </div>
               </div>
               
               <div>

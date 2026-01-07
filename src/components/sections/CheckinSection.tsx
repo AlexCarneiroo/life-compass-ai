@@ -11,11 +11,16 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { checkinService } from '@/lib/firebase/checkin';
+import { financeService } from '@/lib/firebase/finance';
 import { userStatsService, checkAndGrantBadges } from '@/lib/firebase/userStats';
+import { socialService } from '@/lib/firebase/social';
 import { workoutsService } from '@/lib/firebase/workouts';
+import { userSettingsService } from '@/lib/firebase/userSettings';
+import { Spinner } from '@/components/ui/spinner';
 import { DailyCheckIn } from '@/types';
 import { offlineCheckinService } from '@/lib/services/offlineCheckin';
 import { logger } from '@/lib/utils/logger';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const moodReasons = [
   { id: 'work', label: 'Trabalho', icon: '💼' },
@@ -28,6 +33,7 @@ const moodReasons = [
 
 export function CheckinSection() {
   const { userId } = useAuth();
+  const { scheduleCheckinReminder } = usePushNotifications();
   const [step, setStep] = useState(1);
   const [mood, setMood] = useState<number | null>(null);
   const [moodReason, setMoodReason] = useState<string | null>(null);
@@ -42,6 +48,7 @@ export function CheckinSection() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [saving, setSaving] = useState(false);
 
   const totalSteps = 4;
 
@@ -175,6 +182,7 @@ export function CheckinSection() {
   };
 
   const handleSave = async () => {
+    setSaving(true);
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -212,6 +220,45 @@ export function CheckinSection() {
       if (currentCheckin) {
         // Sempre atualiza se já existe
         await checkinService.update(currentCheckin.id, checkinData);
+
+        // Se houver gastos reportados, cria/atualiza entrada financeira vinculada
+        try {
+          const amount = checkinData.expenses || 0;
+          if (amount > 0) {
+            if ((currentCheckin as any).financeEntryId) {
+              // Atualiza entrada financeira existente
+              await financeService.update((currentCheckin as any).financeEntryId, {
+                amount,
+                date: todayStr,
+                type: 'expense',
+                category: 'Check-in',
+                description: 'Gastos do dia (check-in)'
+              });
+            } else {
+              const financeId = await financeService.create({
+                date: todayStr,
+                amount,
+                type: 'expense',
+                category: 'Check-in',
+                description: 'Gastos do dia (check-in)'
+              }, userId);
+              // vincula ao check-in
+              await checkinService.update(currentCheckin.id, { financeEntryId: financeId });
+            }
+          } else {
+            // Se amount === 0 e havia uma entrada financeira vinculada, opcionalmente remover
+            if ((currentCheckin as any).financeEntryId) {
+              try {
+                await financeService.delete((currentCheckin as any).financeEntryId);
+                await checkinService.update(currentCheckin.id, { financeEntryId: undefined });
+              } catch (err) {
+                // ignore
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Erro ao sincronizar entrada financeira do check-in:', err);
+        }
         
         // Se treinou e não tinha treino registrado hoje, cria
         if (workout) {
@@ -248,6 +295,18 @@ export function CheckinSection() {
         // Aguarda um pouco para garantir que o Firebase processou
         await new Promise(resolve => setTimeout(resolve, 1000));
         
+        // Agenda lembrete de check-in para amanhã
+        try {
+          const tomorrowTime = new Date();
+          tomorrowTime.setDate(tomorrowTime.getDate() + 1);
+          const notificationSettings = await userSettingsService.getNotificationSettings(userId);
+          if (notificationSettings.checkinReminderEnabled && notificationSettings.checkinReminderTime) {
+            await scheduleCheckinReminder(notificationSettings.checkinReminderTime);
+          }
+        } catch (error) {
+          // Silenciosamente falha no agendamento
+        }
+        
         // Força recarregar o check-in do dia
         await loadTodayCheckin();
         
@@ -256,7 +315,24 @@ export function CheckinSection() {
         setStep(1);
       } else {
         // Só cria se não existe
-        await checkinService.create(checkinData, userId);
+        const newCheckinId = await checkinService.create(checkinData, userId);
+        // Se houver gastos reportados, cria entrada financeira vinculada
+        try {
+          const amount = checkinData.expenses || 0;
+          if (amount > 0) {
+            const financeId = await financeService.create({
+              date: todayStr,
+              amount,
+              type: 'expense',
+              category: 'Check-in',
+              description: 'Gastos do dia (check-in)'
+            }, userId);
+            // Atualiza check-in com id da entrada financeira
+            await checkinService.update(newCheckinId, { financeEntryId: financeId });
+          }
+        } catch (err) {
+          console.error('Erro ao criar entrada financeira do check-in:', err);
+        }
         // Se treinou, cria treino automaticamente
         if (workout) {
           try {
@@ -305,6 +381,23 @@ export function CheckinSection() {
             description: badge.description,
             duration: 5000,
           });
+          // Compartilha a conquista no feed social
+          try {
+            await socialService.shareAchievement(userId, {
+              id: badge.id,
+              name: badge.name,
+              icon: badge.icon || '🏆',
+            });
+          } catch (error) {
+            console.error('Erro ao compartilhar conquista:', error);
+          }
+        }
+        
+        // Compartilha sequência (streak) a cada 7 dias
+        try {
+          await socialService.shareStreak(userId, newStreak);
+        } catch (error) {
+          console.error('Erro ao compartilhar sequência:', error);
         }
         
         toast.success('Check-in salvo com sucesso!', {
@@ -313,6 +406,16 @@ export function CheckinSection() {
         
         // Aguarda um pouco para garantir que o Firebase processou
         await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Agenda lembrete de check-in para amanhã
+        try {
+          const notificationSettings = await userSettingsService.getNotificationSettings(userId);
+          if (notificationSettings.checkinReminderEnabled && notificationSettings.checkinReminderTime) {
+            await scheduleCheckinReminder(notificationSettings.checkinReminderTime);
+          }
+        } catch (error) {
+          // Silenciosamente falha no agendamento
+        }
         
         // Força recarregar o check-in do dia
         await loadTodayCheckin();
@@ -330,6 +433,9 @@ export function CheckinSection() {
     } catch (error) {
       console.error('Erro ao salvar check-in:', error);
       toast.error('Erro ao salvar check-in');
+    }
+    finally {
+      setSaving(false);
     }
   };
 
@@ -771,13 +877,17 @@ export function CheckinSection() {
           </Button>
         ) : (
           <Button 
-            variant="success" 
-            onClick={handleSave}
-            disabled={loading}
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {existingCheckin ? 'Atualizar Check-in' : 'Salvar Check-in'}
-          </Button>
+              variant="success" 
+              onClick={handleSave}
+              disabled={loading || saving}
+            >
+              {saving ? (
+                <Spinner className="w-4 h-4 mr-2 text-primary-foreground" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              {saving ? (existingCheckin ? 'Atualizando...' : 'Salvando...') : (existingCheckin ? 'Atualizar Check-in' : 'Salvar Check-in')}
+            </Button>
         )}
       </div>
     </div>

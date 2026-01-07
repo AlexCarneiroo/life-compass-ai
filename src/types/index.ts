@@ -12,6 +12,7 @@ export interface DailyCheckIn {
   sleepHours: number;
   reflection: string;
   moodReason?: string;
+  financeEntryId?: string;
 }
 
 export type HabitDifficulty = 'very-easy' | 'easy' | 'normal' | 'hard' | 'very-hard' | 'extreme';

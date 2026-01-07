@@ -384,7 +384,8 @@ export function MobileNav({ activeSection, onSectionChange }: MobileNavProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50"
+        className="lg:hidden fixed left-0 right-0 z-50"
+        style={{ bottom: 'env(safe-area-inset-bottom, 0)', WebkitTransform: 'translateZ(0)', touchAction: 'pan-y' }}
       >
         {/* Background blur */}
         <div className="absolute inset-0 bg-background/80 backdrop-blur-xl border-t border-border/50" />
